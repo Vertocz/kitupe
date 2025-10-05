@@ -16,7 +16,10 @@ def search_wikidata_entity(name):
         "language": "fr",
         "format": "json"
     }
-    r = requests.get(url, params=params)
+    headers = {
+        "User-Agent": "KitupéApp/1.0 (ton-email@example.com)"  # <-- obligatoire
+    }
+    r = requests.get(url, params=params, headers=headers)
     r.raise_for_status()
     results = r.json().get("search", [])
     return results[0]["id"] if results else None
