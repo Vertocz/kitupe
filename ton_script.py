@@ -10,9 +10,16 @@ HEADERS = {
 def run_sparql(query):
     headers = HEADERS.copy()
     headers["Accept"] = "application/sparql+json"
-    r = requests.get(WIKIDATA_SPARQL, params={"query": query}, headers=headers)
-    r.raise_for_status()
-    return r.json()["results"]["bindings"]
+    try:
+        r = requests.get(WIKIDATA_SPARQL, params={"query": query}, headers=headers, timeout=10)
+        r.raise_for_status()
+        return r.json().get("results", {}).get("bindings", [])
+    except requests.exceptions.RequestException as e:
+        print("Erreur HTTP SPARQL:", e)
+        return []
+    except ValueError:
+        print("Réponse SPARQL non JSON")
+        return []
 
 def search_wikidata_entity(name):
     url = "https://www.wikidata.org/w/api.php"
@@ -22,17 +29,37 @@ def search_wikidata_entity(name):
         "language": "fr",
         "format": "json"
     }
-    r = requests.get(url, params=params, headers=HEADERS)
-    r.raise_for_status()
-    results = r.json().get("search", [])
-    return results[0]["id"] if results else None
+    try:
+        r = requests.get(url, params=params, headers=HEADERS, timeout=10)
+        r.raise_for_status()
+        data = r.json()
+        results = data.get("search", [])
+        if not results:
+            print(f"Aucun résultat trouvé pour '{name}'")
+            return None
+        return results[0]["id"]
+    except requests.exceptions.RequestException as e:
+        print("Erreur HTTP search_wikidata_entity:", e)
+        return None
+    except ValueError:
+        print("Réponse search_wikidata_entity non JSON")
+        return None
 
 def get_label(qid):
     url = f"https://www.wikidata.org/wiki/Special:EntityData/{qid}.json"
-    r = requests.get(url, headers=HEADERS)
-    r.raise_for_status()
-    data = r.json()["entities"][qid]
-    return data["labels"].get("fr", data["labels"].get("en", {"value": qid}))["value"]
+    try:
+        r = requests.get(url, headers=HEADERS, timeout=10)
+        r.raise_for_status()
+        data = r.json()
+        entity = data.get("entities", {}).get(qid, {})
+        labels = entity.get("labels", {})
+        return labels.get("fr", labels.get("en", {"value": qid}))["value"]
+    except requests.exceptions.RequestException as e:
+        print("Erreur HTTP get_label:", e)
+        return qid
+    except ValueError:
+        print("Réponse get_label non JSON")
+        return qid
 
 def find_owners(qid, visited=None, path=None, results=None):
     if visited is None:
