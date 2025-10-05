@@ -26,7 +26,10 @@ def search_wikidata_entity(name):
 
 def get_label(qid):
     url = f"https://www.wikidata.org/wiki/Special:EntityData/{qid}.json"
-    r = requests.get(url)
+    headers = {
+        "User-Agent": "KitupéApp/1.0 (ton-email@example.com)"
+    }
+    r = requests.get(url, headers=headers)
     r.raise_for_status()
     data = r.json()["entities"][qid]
     return data["labels"].get("fr", data["labels"].get("en", {"value": qid}))["value"]
