@@ -2,8 +2,14 @@ import requests
 
 WIKIDATA_SPARQL = "https://query.wikidata.org/sparql"
 
+# User-Agent recommandé par Wikidata
+HEADERS = {
+    "User-Agent": "KitupéApp/1.0 (ton-email@example.com)"
+}
+
 def run_sparql(query):
-    headers = {"Accept": "application/sparql+json"}
+    headers = HEADERS.copy()
+    headers["Accept"] = "application/sparql+json"
     r = requests.get(WIKIDATA_SPARQL, params={"query": query}, headers=headers)
     r.raise_for_status()
     return r.json()["results"]["bindings"]
@@ -16,20 +22,14 @@ def search_wikidata_entity(name):
         "language": "fr",
         "format": "json"
     }
-    headers = {
-        "User-Agent": "KitupéApp/1.0 (ton-email@example.com)"  # <-- obligatoire
-    }
-    r = requests.get(url, params=params, headers=headers)
+    r = requests.get(url, params=params, headers=HEADERS)
     r.raise_for_status()
     results = r.json().get("search", [])
     return results[0]["id"] if results else None
 
 def get_label(qid):
     url = f"https://www.wikidata.org/wiki/Special:EntityData/{qid}.json"
-    headers = {
-        "User-Agent": "KitupéApp/1.0 (ton-email@example.com)"
-    }
-    r = requests.get(url, headers=headers)
+    r = requests.get(url, headers=HEADERS)
     r.raise_for_status()
     data = r.json()["entities"][qid]
     return data["labels"].get("fr", data["labels"].get("en", {"value": qid}))["value"]
