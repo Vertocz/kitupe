@@ -75,7 +75,7 @@ def find_owners(qid, visited=None, path=None, results=None):
 
     query = f"""
     SELECT ?owner ?ownerLabel ?ownerType WHERE {{
-      VALUES ?prop {{ wdt:P127 wdt:P749 }}
+      VALUES ?prop {{ wdt:P127 wdt:P749 ^wdt:P127 ^wdt:P749 }}
       wd:{qid} ?prop ?owner .
       OPTIONAL {{ ?owner wdt:P31 ?ownerType . }}
       SERVICE wikibase:label {{ bd:serviceParam wikibase:language "fr,en". }}
@@ -94,9 +94,11 @@ def find_owners(qid, visited=None, path=None, results=None):
 
         new_path = path + [owner_label]
 
-        if "Q5" in owner_type:  # instance of human
+        # Si c’est un humain
+        if "Q5" in owner_type:
             results.append({"chemin": new_path, "type": "humain"})
         else:
+            # sinon continuer récursivement
             find_owners(owner_qid, visited, new_path, results)
 
     return results
