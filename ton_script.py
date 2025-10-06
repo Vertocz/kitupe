@@ -84,21 +84,29 @@ def find_owners(qid, visited=None, path=None, results=None):
     owners = run_sparql(query)
 
     if not owners:
-        results.append({"chemin": path, "type": "organisation"})
+        results.append({
+            "chemin": path,
+            "type": "organisation",
+            "wikipedia": f"https://fr.wikipedia.org/wiki/Special:GoToLinkedPage/frwiki/{qid}"
+        })
         return results
 
     for o in owners:
         owner_qid = o["owner"]["value"].split("/")[-1]
         owner_label = o["ownerLabel"]["value"]
         owner_type = o.get("ownerType", {}).get("value", "")
+        wiki_link = f"https://fr.wikipedia.org/wiki/Special:GoToLinkedPage/frwiki/{owner_qid}"
 
         new_path = path + [owner_label]
 
-        # Si c’est un humain
-        if "Q5" in owner_type:
-            results.append({"chemin": new_path, "type": "humain"})
+        if "Q5" in owner_type:  # humain
+            results.append({
+                "chemin": new_path,
+                "type": "humain",
+                "wikipedia": wiki_link
+            })
         else:
-            # sinon continuer récursivement
+            # continuer récursivement
             find_owners(owner_qid, visited, new_path, results)
 
     return results
