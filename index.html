@@ -1,135 +1,122 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Kitupé 🔍</title>
-  <style>
-    :root {
-      --bg-gradient: linear-gradient(135deg, #ffe0b2, #ffccbc, #ffe0b2);
-      --accent: #ff7043;
-      --text-color: #333;
-      --radius: 14px;
-      --shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
-      --font: "Inter", "Helvetica Neue", Arial, sans-serif;
-    }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kitupé</title>
+    <style>
+        body {
+            font-family: 'Inter', 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #fef6e4, #f9e2af);
+            color: #333;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            min-height: 100vh;
+            margin: 0;
+            padding: 2rem 1rem;
+        }
 
-    body {
-      font-family: var(--font);
-      background: var(--bg-gradient);
-      background-attachment: fixed;
-      color: var(--text-color);
-      text-align: center;
-      margin: 0;
-      padding: 2em;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: flex-start;
-    }
+        h1 {
+            font-size: 2rem;
+            margin-bottom: 1.5rem;
+            color: #2e2b26;
+        }
 
-    h1 {
-      font-weight: 600;
-      font-size: 2em;
-      margin-top: 1em;
-      color: var(--accent);
-    }
+        form {
+            display: flex;
+            flex-direction: row;
+            justify-content: center;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 2rem;
+        }
 
-    form {
-      margin-top: 2em;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 1em;
-      width: 100%;
-      max-width: 400px;
-    }
+        input[type="text"] {
+            padding: 0.6rem 1rem;
+            border: 1px solid #ccc;
+            border-radius: 999px;
+            width: 70vw;
+            max-width: 300px;
+            font-size: 1rem;
+        }
 
-    input {
-      width: 100%;
-      padding: 12px 16px;
-      font-size: 1em;
-      border: none;
-      border-radius: var(--radius);
-      box-shadow: var(--shadow);
-      outline: none;
-    }
+        button {
+            background: #ff914d;
+            color: white;
+            border: none;
+            border-radius: 999px;
+            padding: 0.6rem 1.2rem;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
 
-    input:focus {
-      box-shadow: 0 0 0 3px rgba(255, 112, 67, 0.3);
-    }
+        button:hover {
+            background: #ff7a1a;
+        }
 
-    button {
-      background-color: var(--accent);
-      color: white;
-      font-size: 1em;
-      font-weight: 600;
-      border: none;
-      border-radius: var(--radius);
-      padding: 12px 24px;
-      cursor: pointer;
-      box-shadow: var(--shadow);
-      transition: all 0.2s ease;
-    }
+        .results {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            padding: 1rem;
+            margin-bottom: 1rem;
+            max-width: 600px;
+            width: 90%;
+        }
 
-    button:hover {
-      background-color: #ff5722;
-      transform: translateY(-1px);
-    }
+        .results strong {
+            display: block;
+            font-size: 1rem;
+            color: #222;
+        }
 
-    .results {
-      margin-top: 2em;
-      width: 100%;
-      max-width: 500px;
-      background: rgba(255, 255, 255, 0.8);
-      border-radius: var(--radius);
-      padding: 1em 1.5em;
-      box-shadow: var(--shadow);
-      text-align: left;
-    }
+        .results a {
+            color: #0077cc;
+            text-decoration: none;
+        }
 
-    .results h2 {
-      margin-top: 0;
-      color: var(--accent);
-    }
+        .results a:hover {
+            text-decoration: underline;
+        }
 
-    .results ul {
-      list-style: none;
-      padding: 0;
-    }
-
-    .results li {
-      margin: 0.4em 0;
-      line-height: 1.4;
-    }
-
-    footer {
-      margin-top: auto;
-      font-size: 0.85em;
-      opacity: 0.6;
-      padding-top: 1.5em;
-    }
-  </style>
+        footer {
+            margin-top: auto;
+            padding: 1rem;
+            font-size: 0.85rem;
+            color: #666;
+        }
+    </style>
 </head>
 <body>
-  <h1>🔍 Kitupé</h1>
-  <form method="post">
-    <input type="text" name="query" placeholder="Tape un nom de marque, journal, etc." value="{{ query }}" required>
-    <button type="submit">Kitupé</button>
-  </form>
+    <h1>Kitupé 🔍</h1>
 
-  {% if results %}
-  <div class="results">
-    <h2>Résultats</h2>
-    <ul>
-      {% for r in results %}
-        <li>{{ " → ".join(r.chemin) }} <em>({{ r.type }})</em></li>
-      {% endfor %}
-    </ul>
-  </div>
-  {% endif %}
+    <form method="POST">
+        <input type="text" name="brand" placeholder="Entrez un nom de marque, journal..." required>
+        <button type="submit">Kitupé</button>
+    </form>
 
-  <footer>© Kitupé — savoir qui est derrière les marques</footer>
+    {% if results %}
+        {% for r in results %}
+            <div class="results">
+                <strong>
+                    {{ " → ".join(r.chemin) }}
+                </strong>
+                {% if r.wikipedia %}
+                    <a href="{{ r.wikipedia }}" target="_blank">(Wikipédia)</a>
+                {% endif %}
+            </div>
+        {% endfor %}
+    {% elif error %}
+        <div class="results">
+            <strong>Erreur :</strong> {{ error }}
+        </div>
+    {% endif %}
+
+    <footer>
+        <p>Kitupé — Trouvez qui se cache derrière chaque marque 💡</p>
+    </footer>
 </body>
 </html>
