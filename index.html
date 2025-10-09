@@ -6,117 +6,83 @@
     <title>Kitupé</title>
     <style>
         body {
-            font-family: 'Inter', 'Segoe UI', sans-serif;
-            background: linear-gradient(135deg, #fef6e4, #f9e2af);
+            font-family: "Inter", Arial, sans-serif;
+            background: linear-gradient(120deg, #fdf3e7, #fde6d6);
             color: #333;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: flex-start;
-            min-height: 100vh;
+            text-align: center;
             margin: 0;
-            padding: 2rem 1rem;
+            padding: 0;
         }
-
         h1 {
+            margin-top: 2rem;
             font-size: 2rem;
-            margin-bottom: 1.5rem;
-            color: #2e2b26;
         }
-
         form {
-            display: flex;
-            flex-direction: row;
-            justify-content: center;
-            align-items: center;
-            gap: 0.5rem;
-            margin-bottom: 2rem;
+            margin: 2rem auto;
         }
-
         input[type="text"] {
             padding: 0.6rem 1rem;
             border: 1px solid #ccc;
-            border-radius: 999px;
-            width: 70vw;
+            border-radius: 1rem;
+            width: 60%;
             max-width: 300px;
             font-size: 1rem;
         }
-
         button {
-            background: #ff914d;
-            color: white;
+            background: #ff7e47;
             border: none;
-            border-radius: 999px;
-            padding: 0.6rem 1.2rem;
+            padding: 0.6rem 1.5rem;
+            border-radius: 1rem;
+            color: white;
             font-size: 1rem;
             cursor: pointer;
-            transition: all 0.2s ease;
+            margin-left: 0.5rem;
+            transition: 0.2s;
         }
-
         button:hover {
-            background: #ff7a1a;
+            background: #e46b38;
         }
-
-        .results {
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-            padding: 1rem;
+        .result {
+            margin-top: 2rem;
+            background: #fff;
+            border-radius: 1rem;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+            display: inline-block;
+            padding: 1rem 2rem;
+            text-align: left;
+        }
+        .chain {
             margin-bottom: 1rem;
-            max-width: 600px;
-            width: 90%;
         }
-
-        .results strong {
-            display: block;
-            font-size: 1rem;
-            color: #222;
-        }
-
-        .results a {
-            color: #0077cc;
+        a {
+            color: #ff7e47;
             text-decoration: none;
         }
-
-        .results a:hover {
+        a:hover {
             text-decoration: underline;
-        }
-
-        footer {
-            margin-top: auto;
-            padding: 1rem;
-            font-size: 0.85rem;
-            color: #666;
         }
     </style>
 </head>
 <body>
-    <h1>Kitupé 🔍</h1>
-
+    <h1>🔎 Kitupé</h1>
     <form method="POST">
-        <input type="text" name="query" placeholder="Entrez un nom de marque, journal..." required>
+        <input type="text" name="brand" placeholder="Entrez une marque ou un média..." required value="{{ query }}">
         <button type="submit">Kitupé</button>
     </form>
 
     {% if results %}
-        {% for r in results %}
-            <div class="results">
-                <strong>
-                    {{ " → ".join(r.chemin) }}
-                </strong>
-                {% if r.wikipedia %}
-                    <a href="{{ r.wikipedia }}" target="_blank">(Wikipédia)</a>
-                {% endif %}
-            </div>
-        {% endfor %}
-    {% elif error %}
-        <div class="results">
-            <strong>Erreur :</strong> {{ error }}
+        <div class="result">
+            {% for r in results %}
+                <div class="chain">
+                    {% for step in r.chemin %}
+                        {{ step }} {% if not loop.last %} → {% endif %}
+                    {% endfor %}
+                </div>
+                <div><b>Type :</b> {{ r.type }}</div>
+                <div><a href="{{ r.wikipedia }}" target="_blank">Page Wikipédia</a></div>
+                <hr>
+            {% endfor %}
         </div>
     {% endif %}
-
-    <footer>
-        <p>Kitupé — Trouvez qui se cache derrière chaque marque 💡</p>
-    </footer>
 </body>
 </html>
