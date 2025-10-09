@@ -1,135 +1,88 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Kitupé 🔍</title>
-  <style>
-    :root {
-      --bg-gradient: linear-gradient(135deg, #ffe0b2, #ffccbc, #ffe0b2);
-      --accent: #ff7043;
-      --text-color: #333;
-      --radius: 14px;
-      --shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
-      --font: "Inter", "Helvetica Neue", Arial, sans-serif;
-    }
-
-    body {
-      font-family: var(--font);
-      background: var(--bg-gradient);
-      background-attachment: fixed;
-      color: var(--text-color);
-      text-align: center;
-      margin: 0;
-      padding: 2em;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: flex-start;
-    }
-
-    h1 {
-      font-weight: 600;
-      font-size: 2em;
-      margin-top: 1em;
-      color: var(--accent);
-    }
-
-    form {
-      margin-top: 2em;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 1em;
-      width: 100%;
-      max-width: 400px;
-    }
-
-    input {
-      width: 100%;
-      padding: 12px 16px;
-      font-size: 1em;
-      border: none;
-      border-radius: var(--radius);
-      box-shadow: var(--shadow);
-      outline: none;
-    }
-
-    input:focus {
-      box-shadow: 0 0 0 3px rgba(255, 112, 67, 0.3);
-    }
-
-    button {
-      background-color: var(--accent);
-      color: white;
-      font-size: 1em;
-      font-weight: 600;
-      border: none;
-      border-radius: var(--radius);
-      padding: 12px 24px;
-      cursor: pointer;
-      box-shadow: var(--shadow);
-      transition: all 0.2s ease;
-    }
-
-    button:hover {
-      background-color: #ff5722;
-      transform: translateY(-1px);
-    }
-
-    .results {
-      margin-top: 2em;
-      width: 100%;
-      max-width: 500px;
-      background: rgba(255, 255, 255, 0.8);
-      border-radius: var(--radius);
-      padding: 1em 1.5em;
-      box-shadow: var(--shadow);
-      text-align: left;
-    }
-
-    .results h2 {
-      margin-top: 0;
-      color: var(--accent);
-    }
-
-    .results ul {
-      list-style: none;
-      padding: 0;
-    }
-
-    .results li {
-      margin: 0.4em 0;
-      line-height: 1.4;
-    }
-
-    footer {
-      margin-top: auto;
-      font-size: 0.85em;
-      opacity: 0.6;
-      padding-top: 1.5em;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kitupé</title>
+    <style>
+        body {
+            font-family: "Inter", Arial, sans-serif;
+            background: linear-gradient(120deg, #fdf3e7, #fde6d6);
+            color: #333;
+            text-align: center;
+            margin: 0;
+            padding: 0;
+        }
+        h1 {
+            margin-top: 2rem;
+            font-size: 2rem;
+        }
+        form {
+            margin: 2rem auto;
+        }
+        input[type="text"] {
+            padding: 0.6rem 1rem;
+            border: 1px solid #ccc;
+            border-radius: 1rem;
+            width: 60%;
+            max-width: 300px;
+            font-size: 1rem;
+        }
+        button {
+            background: #ff7e47;
+            border: none;
+            padding: 0.6rem 1.5rem;
+            border-radius: 1rem;
+            color: white;
+            font-size: 1rem;
+            cursor: pointer;
+            margin-left: 0.5rem;
+            transition: 0.2s;
+        }
+        button:hover {
+            background: #e46b38;
+        }
+        .result {
+            margin-top: 2rem;
+            background: #fff;
+            border-radius: 1rem;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+            display: inline-block;
+            padding: 1rem 2rem;
+            text-align: left;
+        }
+        .chain {
+            margin-bottom: 1rem;
+        }
+        a {
+            color: #ff7e47;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+    </style>
 </head>
 <body>
-  <h1>🔍 Kitupé</h1>
-  <form method="post">
-    <input type="text" name="query" placeholder="Tape un nom de marque, journal, etc." value="{{ query }}" required>
-    <button type="submit">Kitupé</button>
-  </form>
+    <h1>🔎 Kitupé</h1>
+    <form method="POST">
+        <input type="text" name="brand" placeholder="Entrez une marque ou un média..." required value="{{ query }}">
+        <button type="submit">Kitupé</button>
+    </form>
 
-  {% if results %}
-  <div class="results">
-    <h2>Résultats</h2>
-    <ul>
-      {% for r in results %}
-        <li>{{ " → ".join(r.chemin) }} <em>({{ r.type }})</em></li>
-      {% endfor %}
-    </ul>
-  </div>
-  {% endif %}
-
-  <footer>© Kitupé — savoir qui est derrière les marques</footer>
+    {% if results %}
+        <div class="result">
+            {% for r in results %}
+                <div class="chain">
+                    {% for step in r.chemin %}
+                        {{ step }} {% if not loop.last %} → {% endif %}
+                    {% endfor %}
+                </div>
+                <div><b>Type :</b> {{ r.type }}</div>
+                <div><a href="{{ r.wikipedia }}" target="_blank">Page Wikipédia</a></div>
+                <hr>
+            {% endfor %}
+        </div>
+    {% endif %}
 </body>
 </html>
