@@ -427,7 +427,7 @@
 
         function displayResults(data) {
             if (!data.best_result) {
-                showError('Aucun résultat trouvé. Essaie une autre recherche.');
+                showError('Aucun résultat trouvé. Essaie avec un autre nom (cherche plutôt la marque/compagnie, pas le produit).');
                 return;
             }
 
@@ -439,36 +439,40 @@
                     <div class="result-section">
                         <div class="source-accordion active">
                             <div class="accordion-header active" onclick="toggleAccordion(this)">
-                                <span>${best.source}</span>
+                                <span>✓ ${best.source} (meilleur résultat)</span>
                                 <span class="accordion-icon">▼</span>
                             </div>
                             <div class="accordion-content active">
                                 ${renderPath(best.path, best.is_human)}
-                                <div class="source-label">Source: <a href="${best.url}" target="_blank" class="source-link">${best.source}</a></div>
+                                <div class="source-label">Source: <strong>${best.source}</strong></div>
                             </div>
                         </div>
             `;
 
-            // Autres sources
-            if (data.wikidata.length > 0 && data.best_result.source !== 'Wikidata') {
-                html += renderAlternativeSource('Wikidata', data.wikidata[0]);
-            }
-            if (data.wikipedia.length > 0 && data.best_result.source !== 'Wikipedia') {
-                html += renderAlternativeSource('Wikipedia', data.wikipedia[0]);
-            }
-            if (data.opencorporates.length > 0 && data.best_result.source !== 'OpenCorporates') {
-                html += renderAlternativeSource('OpenCorporates', data.opencorporates[0]);
-            }
+            // Toutes les autres sources
+            const sources = [
+                {name: 'Wikidata', data: data.wikidata},
+                {name: 'Wikipedia', data: data.wikipedia},
+                {name: 'OpenCorporates', data: data.opencorporates},
+                {name: 'Yahoo Finance', data: data.yahoo_finance},
+                {name: 'Google Search', data: data.google_search}
+            ];
+
+            sources.forEach(src => {
+                if (src.data.length > 0 && src.name !== best.source) {
+                    html += renderAlternativeSource(src.name, src.data[0]);
+                }
+            });
 
             html += '</div>';
 
             // Alternatives
             if (data.alternatives.length > 0) {
-                html += '<div class="alternatives"><div class="alternatives-title">Autres résultats possibles</div>';
+                html += '<div class="alternatives"><div class="alternatives-title">Autres possibilités trouvées</div>';
                 data.alternatives.forEach(alt => {
                     html += `
                         <div class="alternative-item">
-                            <div class="alternative-path">${alt.path.join(' → ')}</div>
+                            <div class="alternative-path">${alt.path.map(p => escapeHtml(p)).join(' → ')}</div>
                             <div class="alternative-source">${alt.source}</div>
                         </div>
                     `;
