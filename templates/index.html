@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kitupé - Qui j'enrichis vraiment ?</title>
+    <title>Kitupé - Qui j'enrichis vraiment</title>
     <style>
         * {
             margin: 0;
@@ -434,17 +434,27 @@
             const best = data.best_result;
             let html = `
                 <div class="result-card">
-                    <div class="result-title">${escapeHtml(data.query)}</div>
+                    <div style="display: flex; gap: 30px; margin-bottom: 30px; align-items: flex-start;">
+                        <div style="flex: 1;">
+                            <div class="result-title">${escapeHtml(data.query)}</div>
+                            ${data.images.company_logo ? `<img src="${data.images.company_logo}" alt="Logo" style="max-width: 150px; max-height: 150px; margin-top: 15px; border-radius: 8px;">` : ''}
+                        </div>
+                        <div style="flex: 1; text-align: center;">
+                            <div style="font-size: 0.9em; color: #999; margin-bottom: 10px;">Propriétaire</div>
+                            <div style="font-weight: 600; font-size: 1.2em; color: #333; margin-bottom: 15px;">${escapeHtml(best.path[best.path.length - 1])}</div>
+                            ${data.images.owner_photo ? `<img src="${data.images.owner_photo}" alt="Propriétaire" style="max-width: 150px; max-height: 150px; border-radius: 8px; object-fit: cover;">` : ''}
+                        </div>
+                    </div>
                     
                     <div class="result-section">
                         <div class="source-accordion active">
                             <div class="accordion-header active" onclick="toggleAccordion(this)">
-                                <span>✓ ${best.source}</span>
+                                <span>Chaîne de propriété</span>
                                 <span class="accordion-icon">▼</span>
                             </div>
                             <div class="accordion-content active">
                                 ${renderPath(best.path, best.is_human)}
-                                <div class="source-label">Source: <strong>${best.source}</strong></div>
+                                <div class="source-label" style="border-top: 1px solid #e9ecef; padding-top: 12px; margin-top: 12px;">Source: <strong>${best.source}</strong></div>
                             </div>
                         </div>
             `;
