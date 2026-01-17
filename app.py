@@ -131,7 +131,45 @@ def get_label(entity: Dict) -> str:
     labels = entity.get("labels", {})
     return labels.get("en", {}).get("value", "Unknown")
 
-def is_human(entity: Dict) -> bool:
+def get_wikidata_images(qid: str) -> Dict:
+    """Récupère les images associées à une entité Wikidata"""
+    try:
+        entity = get_wikidata_entity(qid)
+        if not entity:
+            return {"logo": None, "image": None}
+        
+        claims = entity.get("claims", {})
+        images = {
+            "logo": None,
+            "image": None
+        }
+        
+        # P154 = logo
+        if "P154" in claims:
+            for claim in claims["P154"]:
+                mainsnak = claim.get("mainsnak", {})
+                datavalue = mainsnak.get("datavalue", {})
+                if datavalue.get("type") == "string":
+                    filename = datavalue.get("value", "")
+                    if filename:
+                        images["logo"] = f"https://commons.wikimedia.org/wiki/Special:FilePath/{filename}?width=200"
+                        break
+        
+        # P18 = image
+        if "P18" in claims:
+            for claim in claims["P18"]:
+                mainsnak = claim.get("mainsnak", {})
+                datavalue = mainsnak.get("datavalue", {})
+                if datavalue.get("type") == "string":
+                    filename = datavalue.get("value", "")
+                    if filename:
+                        images["image"] = f"https://commons.wikimedia.org/wiki/Special:FilePath/{filename}?width=200"
+                        break
+        
+        return images
+    except Exception as e:
+        logger.warning(f"Get Wikidata images error: {e}")
+        return {"logo": None, "image": None}
     """Vérifie si c'est une personne"""
     claims = entity.get("claims", {})
     instance_of = claims.get("P31", [])
@@ -265,7 +303,11 @@ def find_owner(query: str) -> Dict:
         "query": query,
         "primary_result": None,
         "verification": [],
-        "best_result": None
+        "best_result": None,
+        "images": {
+            "company_logo": None,
+            "owner_photo": None
+        }
     }
     
     # 1. Tavily cherche
@@ -281,13 +323,25 @@ def find_owner(query: str) -> Dict:
     results["primary_result"] = {
         "path": [query, owner_name],
         "is_human": True,
-        "source": "Tavily (recherche)"
+        "source": "Recherche"
     }
     
-    # 2. Vérifie avec Wikidata
-    wikidata_verification = verify_with_wikidata(query)
-    if wikidata_verification:
-        results["verification"].append(wikidata_verification)
+    # 2. Cherche les images de la compagnie
+    company_qid = search_wikidata_entity(query)
+    if company_qid:
+        company_images = get_wikidata_images(company_qid)
+        results["images"]["company_logo"] = company_images.get("logo")
+        
+        # Vérifie avec Wikidata
+        wikidata_verification = verify_with_wikidata(query)
+        if wikidata_verification:
+            results["verification"].append(wikidata_verification)
+            
+            # Cherche la photo du propriétaire
+            owner_qid = search_wikidata_entity(owner_name)
+            if owner_qid:
+                owner_images = get_wikidata_images(owner_qid)
+                results["images"]["owner_photo"] = owner_images.get("image")
     
     # 3. Vérifie avec Wikipedia
     wikipedia_verification = verify_with_wikipedia(query)
