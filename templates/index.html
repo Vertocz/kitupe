@@ -427,7 +427,7 @@
 
         function displayResults(data) {
             if (!data.best_result) {
-                showError('Aucun résultat trouvé. Essaie avec un autre nom (cherche plutôt la marque/compagnie, pas le produit).');
+                showError('Aucun résultat trouvé. Essaie avec un nom de compagnie/marque/chaine connu.');
                 return;
             }
 
@@ -439,7 +439,7 @@
                     <div class="result-section">
                         <div class="source-accordion active">
                             <div class="accordion-header active" onclick="toggleAccordion(this)">
-                                <span>✓ ${best.source} (meilleur résultat)</span>
+                                <span>✓ ${best.source}</span>
                                 <span class="accordion-icon">▼</span>
                             </div>
                             <div class="accordion-content active">
@@ -449,40 +449,33 @@
                         </div>
             `;
 
-            // Toutes les autres sources
-            const sources = [
-                {name: 'Wikidata', data: data.wikidata},
-                {name: 'Wikipedia', data: data.wikipedia},
-                {name: 'OpenCorporates', data: data.opencorporates},
-                {name: 'DuckDuckGo', data: data.duckduckgo}
-            ];
-
-            sources.forEach(src => {
-                if (src.data.length > 0 && src.name !== best.source) {
-                    html += renderAlternativeSource(src.name, src.data[0]);
-                }
-            });
-
-            html += '</div>';
-
-            // Alternatives
-            if (data.alternatives.length > 0) {
-                html += '<div class="alternatives"><div class="alternatives-title">Autres possibilités trouvées</div>';
-                data.alternatives.forEach(alt => {
+            // Affiche les vérifications
+            if (data.verification && data.verification.length > 0) {
+                html += '<div style="margin-top: 20px; padding-top: 20px; border-top: 2px solid #f0f0f0;"><div style="font-size: 0.9em; color: #999; margin-bottom: 12px;">Vérification :</div>';
+                
+                data.verification.forEach(verification => {
                     html += `
-                        <div class="alternative-item">
-                            <div class="alternative-path">${alt.path.map(p => escapeHtml(p)).join(' → ')}</div>
-                            <div class="alternative-source">${alt.source}</div>
+                        <div class="source-accordion">
+                            <div class="accordion-header" onclick="toggleAccordion(this)">
+                                <span>${verification.source}</span>
+                                <span class="accordion-icon">▼</span>
+                            </div>
+                            <div class="accordion-content">
+                                ${renderPath(verification.path, verification.is_human)}
+                                <div class="source-label">Source: <strong>${verification.source}</strong></div>
+                            </div>
                         </div>
                     `;
                 });
+                
                 html += '</div>';
             }
+
+            html += '</div>';
 
             resultsDiv.innerHTML = html;
             resultsDiv.classList.add('active');
 
-            // Ajoute les event listeners pour accordions
             document.querySelectorAll('.accordion-header').forEach(header => {
                 header.addEventListener('click', function() {
                     toggleAccordion(this);
