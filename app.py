@@ -1,109 +1,101 @@
 from flask import Flask, render_template, request, jsonify
 import requests
 from bs4 import BeautifulSoup
-import json
 from typing import Optional, List, Dict
 import logging
 import re
+import os
 
 app = Flask(__name__)
 
+# Configuration
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
 }
+
+TAVILY_API_KEY = os.environ.get("TAVILY_API_KEY")
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # ============================================================================
-# DUCKDUCKGO - Source principale
+# TAVILY - Source principale (recherche web)
 # ============================================================================
 
-def search_duckduckgo(query: str) -> Optional[Dict]:
-    """Cherche via DuckDuckGo API avec plusieurs requêtes"""
+def search_tavily(query: str) -> Optional[Dict]:
+    """Cherche via Tavily API"""
+    if not TAVILY_API_KEY:
+        logger.error("TAVILY_API_KEY not set")
+        return None
+    
     try:
-        url = "https://api.duckduckgo.com/"
-        
-        # Essaie d'abord une requête directe
-        queries = [
-            f"{query} company owner",
-            f"{query} founder",
-            f"{query} who owns",
-            query  # Fallback simple
-        ]
-        
-        for q in queries:
-            params = {
-                "q": q,
-                "format": "json"
-            }
-            r = requests.get(url, params=params, headers=HEADERS, timeout=5)
-            r.raise_for_status()
-            result = r.json()
-            
-            # Si on a un résultat avec du contenu, on le retourne
-            if result.get("AbstractText") or result.get("Definition"):
-                logger.info(f"DuckDuckGo found result for query: {q}")
-                return result
-        
-        # Si aucune requête n'a donné de résultat, retourne la dernière
+        url = "https://api.tavily.com/search"
+        payload = {
+            "api_key": TAVILY_API_KEY,
+            "query": f"{query} owner founder company",
+            "include_answer": True,
+            "max_results": 5
+        }
+        r = requests.post(url, json=payload, timeout=10)
+        r.raise_for_status()
+        result = r.json()
+        logger.info(f"Tavily found {len(result.get('results', []))} results for '{query}'")
         return result
     except Exception as e:
-        logger.warning(f"DuckDuckGo error: {e}")
+        logger.error(f"Tavily error: {e}")
         return None
 
-def extract_owner_from_duckduckgo(query: str, ddg_result: Dict) -> Optional[str]:
-    """Extrait le nom du propriétaire des résultats DuckDuckGo"""
+def extract_owner_from_tavily(query: str, tavily_result: Dict) -> Optional[str]:
+    """Extrait le propriétaire des résultats Tavily"""
     try:
-        # D'abord, regarde l'abstract
-        abstract = ddg_result.get("AbstractText", "")
-        logger.info(f"DuckDuckGo abstract for '{query}': {abstract[:300] if abstract else 'EMPTY'}")
+        # D'abord, regarde la réponse AI
+        ai_answer = tavily_result.get("answer", "")
+        logger.info(f"Tavily AI answer: {ai_answer[:300] if ai_answer else 'EMPTY'}")
         
-        if abstract:
-            # Patterns plus flexibles
+        if ai_answer:
+            # Patterns pour extraire le propriétaire
             patterns = [
-                r"owned by ([A-Z][a-zA-Z\s&\-\.]+?)(?:\.|,|;| and)",
-                r"founder[s]?(?:\s+(?:and|is))? ([A-Z][a-zA-Z\s&\-\.]+?)(?:\.|,|;)",
-                r"founded by ([A-Z][a-zA-Z\s&\-\.]+?)(?:\.|,|;)",
-                r"CEO (?:is|:) ([A-Z][a-zA-Z\s&\-\.]+?)(?:\.|,|;)",
+                r"(?:owned by|founder|founded by|CEO|owner is)\s+([A-Z][a-zA-Z\s&\-\.\']+?)(?:\.|,|;|\s+and)",
+                r"([A-Z][a-zA-Z\s&\-\.\']+?)\s+(?:founded|owns|owned|is the founder)",
             ]
             
             for pattern in patterns:
-                matches = re.finditer(pattern, abstract)
-                for match in matches:
+                match = re.search(pattern, ai_answer)
+                if match:
                     owner = match.group(1).strip().rstrip('.,;')
-                    # Filtre les mauvais résultats
                     if (len(owner) > 2 and 
-                        owner.lower() != query.lower() and 
-                        not any(x in owner.lower() for x in ['the ', 'and is', 'was ', 'is a'])):
-                        logger.info(f"Found owner from pattern '{pattern}': {owner}")
+                        owner.lower() != query.lower() and
+                        not any(x in owner.lower() for x in ['the ', 'company', 'corporation'])):
+                        logger.info(f"Found owner from AI answer: {owner}")
                         return owner
-            
-            # Si pas de pattern, essaie d'extraire les noms propres
-            # Cherche des phrases avec "is" ou "was"
-            sentences = abstract.split('. ')
-            for sentence in sentences[:3]:
-                if any(kw in sentence.lower() for kw in ['founded', 'owner', 'founder', 'created']):
-                    # Extrait les mots capitalisés (noms propres)
-                    words = sentence.split()
-                    for i, word in enumerate(words):
-                        if word and word[0].isupper() and len(word) > 2:
-                            potential = ' '.join(words[i:min(i+3, len(words))])
-                            potential = potential.rstrip('.,;')
-                            if (potential.lower() != query.lower() and 
-                                len(potential) > 2 and
-                                not any(x in potential.lower() for x in ['the ', 'and ', 'is a'])):
-                                logger.info(f"Found owner from sentence: {potential}")
-                                return potential
         
-        logger.warning(f"No owner extracted from DuckDuckGo for '{query}'")
+        # Sinon, regarde les résultats
+        results = tavily_result.get("results", [])
+        for result in results:
+            snippet = result.get("content", "")
+            
+            # Cherche les patterns dans le snippet
+            patterns = [
+                r"(?:owned by|founder|founded by)\s+([A-Z][a-zA-Z\s&\-\.\']+?)(?:\.|,|;)",
+                r"([A-Z][a-zA-Z\s&\-\.\']+?)\s+(?:founded|owns)",
+            ]
+            
+            for pattern in patterns:
+                match = re.search(pattern, snippet)
+                if match:
+                    owner = match.group(1).strip().rstrip('.,;')
+                    if len(owner) > 2 and owner.lower() != query.lower():
+                        logger.info(f"Found owner from snippet: {owner}")
+                        return owner
+        
+        logger.warning(f"No owner extracted from Tavily for '{query}'")
         return None
     except Exception as e:
-        logger.error(f"Extract from DuckDuckGo error: {e}")
+        logger.error(f"Extract from Tavily error: {e}")
         return None
 
 # ============================================================================
-# WIKIDATA - Vérification et enrichissement
+# WIKIDATA - Vérification
 # ============================================================================
 
 def search_wikidata_entity(name: str) -> Optional[str]:
@@ -151,10 +143,9 @@ def is_human(entity: Dict) -> bool:
                 return True
     return False
 
-def verify_with_wikidata(company_name: str, owner_name: str) -> Optional[Dict]:
-    """Vérifie et enrichit les données avec Wikidata"""
+def verify_with_wikidata(company_name: str) -> Optional[Dict]:
+    """Vérifie et enrichit avec Wikidata"""
     try:
-        # Cherche la compagnie
         company_qid = search_wikidata_entity(company_name)
         if not company_qid:
             return None
@@ -165,11 +156,10 @@ def verify_with_wikidata(company_name: str, owner_name: str) -> Optional[Dict]:
         
         company_label = get_label(company)
         path = [company_label]
-        
-        # Cherche les propriétaires/fondateurs
         claims = company.get("claims", {})
         
-        for prop in ["P127", "P749", "P112"]:  # propriétaire, org mère, fondateur
+        # Cherche propriétaires/fondateurs
+        for prop in ["P127", "P749", "P112"]:
             if prop in claims:
                 for claim in claims[prop]:
                     mainsnak = claim.get("mainsnak", {})
@@ -184,14 +174,14 @@ def verify_with_wikidata(company_name: str, owner_name: str) -> Optional[Dict]:
                             return {
                                 "path": path + [owner_label],
                                 "is_human": is_owner_human,
-                                "source": "Wikidata (verified)",
+                                "source": "Wikidata (vérification)",
                                 "verified": True
                             }
         
         return {
             "path": path,
             "is_human": False,
-            "source": "Wikidata (verified)",
+            "source": "Wikidata (vérification)",
             "verified": True
         }
     except Exception as e:
@@ -256,7 +246,7 @@ def verify_with_wikipedia(company_name: str) -> Optional[Dict]:
                     return {
                         "path": [wiki_title, owner_name],
                         "is_human": is_owner_human,
-                        "source": "Wikipedia (verified)",
+                        "source": "Wikipedia (vérification)",
                         "verified": True
                     }
         
@@ -270,7 +260,7 @@ def verify_with_wikipedia(company_name: str) -> Optional[Dict]:
 # ============================================================================
 
 def find_owner(query: str) -> Dict:
-    """Pipeline : DuckDuckGo cherche, Wikidata/Wikipedia vérifient"""
+    """Pipeline : Tavily cherche, Wikidata/Wikipedia vérifient"""
     results = {
         "query": query,
         "primary_result": None,
@@ -278,24 +268,24 @@ def find_owner(query: str) -> Dict:
         "best_result": None
     }
     
-    # 1. DuckDuckGo cherche
-    ddg_result = search_duckduckgo(query)
-    if not ddg_result:
+    # 1. Tavily cherche
+    tavily_result = search_tavily(query)
+    if not tavily_result:
         return results
     
-    owner_name = extract_owner_from_duckduckgo(query, ddg_result)
+    owner_name = extract_owner_from_tavily(query, tavily_result)
     if not owner_name:
         return results
     
-    # Résultat primaire de DuckDuckGo
+    # Résultat primaire de Tavily
     results["primary_result"] = {
         "path": [query, owner_name],
         "is_human": True,
-        "source": "DuckDuckGo"
+        "source": "Tavily (recherche)"
     }
     
     # 2. Vérifie avec Wikidata
-    wikidata_verification = verify_with_wikidata(query, owner_name)
+    wikidata_verification = verify_with_wikidata(query)
     if wikidata_verification:
         results["verification"].append(wikidata_verification)
     
@@ -305,7 +295,6 @@ def find_owner(query: str) -> Dict:
         results["verification"].append(wikipedia_verification)
     
     # Détermine le meilleur résultat
-    # Priorise les résultats vérifiés (avec humain trouvé)
     all_candidates = [results["primary_result"]] + results["verification"]
     all_candidates.sort(
         key=lambda x: (-x.get("is_human", False), -len(x.get("path", [])))
@@ -330,6 +319,9 @@ def search():
     
     if not query:
         return jsonify({"error": "Empty query"}), 400
+    
+    if not TAVILY_API_KEY:
+        return jsonify({"error": "API not configured. Please set TAVILY_API_KEY environment variable."}), 500
     
     results = find_owner(query)
     return jsonify(results)
