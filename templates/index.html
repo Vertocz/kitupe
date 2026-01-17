@@ -3,86 +3,543 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kitupé</title>
+    <title>Kitupé - Qui j'enrichis vraiment</title>
     <style>
-        body {
-            font-family: "Inter", Arial, sans-serif;
-            background: linear-gradient(120deg, #fdf3e7, #fde6d6);
-            color: #333;
-            text-align: center;
+        * {
             margin: 0;
             padding: 0;
+            box-sizing: border-box;
         }
-        h1 {
-            margin-top: 2rem;
-            font-size: 2rem;
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
         }
-        form {
-            margin: 2rem auto;
+
+        .container {
+            width: 100%;
+            max-width: 900px;
         }
-        input[type="text"] {
-            padding: 0.6rem 1rem;
-            border: 1px solid #ccc;
-            border-radius: 1rem;
-            width: 60%;
-            max-width: 300px;
-            font-size: 1rem;
-        }
-        button {
-            background: #ff7e47;
-            border: none;
-            padding: 0.6rem 1.5rem;
-            border-radius: 1rem;
+
+        .header {
+            text-align: center;
             color: white;
-            font-size: 1rem;
+            margin-bottom: 40px;
+            animation: fadeIn 0.6s ease-out;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            font-weight: 700;
+            letter-spacing: -1px;
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.95;
+            font-weight: 300;
+        }
+
+        .search-box {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            margin-bottom: 30px;
+            animation: slideUp 0.6s ease-out;
+        }
+
+        .search-box form {
+            display: flex;
+            gap: 10px;
+        }
+
+        .search-box input {
+            flex: 1;
+            padding: 14px 20px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1em;
+            transition: all 0.3s ease;
+        }
+
+        .search-box input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .search-box button {
+            padding: 14px 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1em;
+            font-weight: 600;
             cursor: pointer;
-            margin-left: 0.5rem;
-            transition: 0.2s;
+            transition: all 0.3s ease;
         }
-        button:hover {
-            background: #e46b38;
+
+        .search-box button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
         }
-        .result {
-            margin-top: 2rem;
-            background: #fff;
-            border-radius: 1rem;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+
+        .search-box button:active {
+            transform: translateY(0);
+        }
+
+        .loading {
+            text-align: center;
+            color: white;
+            display: none;
+            margin: 40px 0;
+        }
+
+        .loading.active {
+            display: block;
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid white;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .results {
+            display: none;
+            animation: slideUp 0.6s ease-out;
+        }
+
+        .results.active {
+            display: block;
+        }
+
+        .result-card {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+        }
+
+        .result-title {
+            font-size: 1.8em;
+            font-weight: 700;
+            margin-bottom: 25px;
+            color: #333;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+
+        .result-section {
+            margin-bottom: 20px;
+        }
+
+        .source-accordion {
+            background: #f8f9fa;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            overflow: hidden;
+            border: 1px solid #e9ecef;
+            transition: all 0.3s ease;
+        }
+
+        .source-accordion.active {
+            background: #f0f4ff;
+            border-color: #667eea;
+        }
+
+        .accordion-header {
+            padding: 16px 20px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: 600;
+            color: #333;
+            user-select: none;
+            transition: all 0.2s ease;
+        }
+
+        .accordion-header:hover {
+            background: rgba(102, 126, 234, 0.05);
+        }
+
+        .accordion-header.active {
+            background: rgba(102, 126, 234, 0.1);
+            color: #667eea;
+        }
+
+        .accordion-icon {
+            font-size: 1.2em;
+            transition: transform 0.3s ease;
+        }
+
+        .accordion-header.active .accordion-icon {
+            transform: rotate(180deg);
+        }
+
+        .accordion-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+            background: white;
+        }
+
+        .accordion-content.active {
+            max-height: 500px;
+            padding: 20px;
+            border-top: 1px solid #e9ecef;
+        }
+
+        .path {
+            font-size: 1em;
+            color: #555;
+            line-height: 1.8;
+            margin-bottom: 12px;
+        }
+
+        .path-item {
             display: inline-block;
-            padding: 1rem 2rem;
-            text-align: left;
+            background: #f0f4ff;
+            padding: 6px 12px;
+            border-radius: 6px;
+            margin: 4px 4px 4px 0;
+            font-weight: 500;
+            color: #667eea;
         }
-        .chain {
-            margin-bottom: 1rem;
+
+        .path-arrow {
+            margin: 0 6px;
+            color: #999;
         }
-        a {
-            color: #ff7e47;
+
+        .human-badge {
+            display: inline-block;
+            background: #10b981;
+            color: white;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 0.85em;
+            margin-left: 8px;
+            font-weight: 600;
+        }
+
+        .source-label {
+            font-size: 0.9em;
+            color: #999;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid #e9ecef;
+        }
+
+        .source-link {
+            color: #667eea;
             text-decoration: none;
+            font-weight: 600;
         }
-        a:hover {
+
+        .source-link:hover {
             text-decoration: underline;
+        }
+
+        .alternatives {
+            margin-top: 30px;
+            padding-top: 30px;
+            border-top: 2px solid #f0f0f0;
+        }
+
+        .alternatives-title {
+            font-size: 1.1em;
+            font-weight: 700;
+            color: #666;
+            margin-bottom: 15px;
+        }
+
+        .alternative-item {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border-left: 3px solid #ddd;
+        }
+
+        .alternative-item:hover {
+            background: #f0f4ff;
+            border-left-color: #667eea;
+        }
+
+        .alternative-path {
+            color: #555;
+            font-size: 0.95em;
+        }
+
+        .alternative-source {
+            color: #999;
+            font-size: 0.85em;
+            margin-top: 8px;
+        }
+
+        .error-message {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            text-align: center;
+            color: #dc2626;
+            display: none;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+        }
+
+        .error-message.active {
+            display: block;
+            animation: slideUp 0.6s ease-out;
+        }
+
+        .error-icon {
+            font-size: 2em;
+            margin-bottom: 10px;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 0;
+                transform: translateY(0);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 2em;
+            }
+
+            .search-box form {
+                flex-direction: column;
+            }
+
+            .search-box button {
+                width: 100%;
+            }
+
+            .result-card {
+                padding: 20px;
+            }
         }
     </style>
 </head>
 <body>
-    <h1>🔎 Kitupé</h1>
-    <form method="POST">
-        <input type="text" name="brand" placeholder="Entrez une marque ou un média..." required value="{{ query }}">
-        <button type="submit">Kitupé</button>
-    </form>
-
-    {% if results %}
-        <div class="result">
-            {% for r in results %}
-                <div class="chain">
-                    {% for step in r.chemin %}
-                        {{ step }} {% if not loop.last %} → {% endif %}
-                    {% endfor %}
-                </div>
-                <div><b>Type :</b> {{ r.type }}</div>
-                <div><a href="{{ r.wikipedia }}" target="_blank">Page Wikipédia</a></div>
-                <hr>
-            {% endfor %}
+    <div class="container">
+        <div class="header">
+            <h1>Kitupé</h1>
+            <p>Découvre qui tu enrichis vraiment</p>
         </div>
-    {% endif %}
+
+        <div class="search-box">
+            <form id="searchForm">
+                <input 
+                    type="text" 
+                    id="queryInput" 
+                    placeholder="Cherche une marque, une chaîne, un magasin..." 
+                    required
+                >
+                <button type="submit">Chercher</button>
+            </form>
+        </div>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>Recherche en cours...</p>
+        </div>
+
+        <div class="error-message" id="error">
+            <div class="error-icon">⚠️</div>
+            <p id="errorText"></p>
+        </div>
+
+        <div class="results" id="results"></div>
+    </div>
+
+    <script>
+        const form = document.getElementById('searchForm');
+        const queryInput = document.getElementById('queryInput');
+        const loading = document.getElementById('loading');
+        const error = document.getElementById('error');
+        const errorText = document.getElementById('errorText');
+        const resultsDiv = document.getElementById('results');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const query = queryInput.value.trim();
+            if (!query) return;
+
+            loading.classList.add('active');
+            error.classList.remove('active');
+            resultsDiv.classList.remove('active');
+
+            try {
+                const response = await fetch('/search', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Erreur serveur');
+                }
+
+                displayResults(data);
+            } catch (err) {
+                showError(err.message);
+            } finally {
+                loading.classList.remove('active');
+            }
+        });
+
+        function displayResults(data) {
+            if (!data.best_result) {
+                showError('Aucun résultat trouvé. Essaie une autre recherche.');
+                return;
+            }
+
+            const best = data.best_result;
+            let html = `
+                <div class="result-card">
+                    <div class="result-title">${escapeHtml(data.query)}</div>
+                    
+                    <div class="result-section">
+                        <div class="source-accordion active">
+                            <div class="accordion-header active" onclick="toggleAccordion(this)">
+                                <span>${best.source}</span>
+                                <span class="accordion-icon">▼</span>
+                            </div>
+                            <div class="accordion-content active">
+                                ${renderPath(best.path, best.is_human)}
+                                <div class="source-label">Source: <a href="${best.url}" target="_blank" class="source-link">${best.source}</a></div>
+                            </div>
+                        </div>
+            `;
+
+            // Autres sources
+            if (data.wikidata.length > 0 && data.best_result.source !== 'Wikidata') {
+                html += renderAlternativeSource('Wikidata', data.wikidata[0]);
+            }
+            if (data.wikipedia.length > 0 && data.best_result.source !== 'Wikipedia') {
+                html += renderAlternativeSource('Wikipedia', data.wikipedia[0]);
+            }
+            if (data.opencorporates.length > 0 && data.best_result.source !== 'OpenCorporates') {
+                html += renderAlternativeSource('OpenCorporates', data.opencorporates[0]);
+            }
+
+            html += '</div>';
+
+            // Alternatives
+            if (data.alternatives.length > 0) {
+                html += '<div class="alternatives"><div class="alternatives-title">Autres résultats possibles</div>';
+                data.alternatives.forEach(alt => {
+                    html += `
+                        <div class="alternative-item">
+                            <div class="alternative-path">${alt.path.join(' → ')}</div>
+                            <div class="alternative-source">${alt.source}</div>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+            }
+
+            resultsDiv.innerHTML = html;
+            resultsDiv.classList.add('active');
+
+            // Ajoute les event listeners pour accordions
+            document.querySelectorAll('.accordion-header').forEach(header => {
+                header.addEventListener('click', function() {
+                    toggleAccordion(this);
+                });
+            });
+        }
+
+        function renderAlternativeSource(source, data) {
+            return `
+                <div class="source-accordion">
+                    <div class="accordion-header" onclick="toggleAccordion(this)">
+                        <span>${source}</span>
+                        <span class="accordion-icon">▼</span>
+                    </div>
+                    <div class="accordion-content">
+                        ${renderPath(data.path, data.is_human)}
+                        <div class="source-label">Source: ${source}</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderPath(path, isHuman) {
+            const items = path.map(item => `<span class="path-item">${escapeHtml(item)}</span>`);
+            let html = items.join('<span class="path-arrow">→</span>');
+            if (isHuman) {
+                html += '<span class="human-badge">Personne</span>';
+            }
+            return html;
+        }
+
+        function toggleAccordion(header) {
+            const content = header.nextElementSibling;
+            const isActive = header.classList.contains('active');
+
+            // Ferme tous les autres accordions du même parent
+            const parent = header.closest('.result-section') || header.closest('.results');
+            if (parent) {
+                parent.querySelectorAll('.accordion-header').forEach(h => {
+                    if (h !== header) {
+                        h.classList.remove('active');
+                        h.nextElementSibling.classList.remove('active');
+                    }
+                });
+            }
+
+            header.classList.toggle('active');
+            content.classList.toggle('active');
+        }
+
+        function showError(message) {
+            errorText.textContent = message;
+            error.classList.add('active');
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
 </body>
 </html>
