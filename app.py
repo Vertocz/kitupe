@@ -118,17 +118,17 @@ def extract_owners_wikidata(qid: str, visited=None, path=None, depth=0) -> List[
     return owners
 
 # ============================================================================
-# OPENCORPORATES - Source 2 (améliorée)
+# OPENCORPORATES - Source 2
 # ============================================================================
 
 def search_opencorporates(name: str) -> Optional[Dict]:
-    """Cherche sur OpenCorporates avec meilleure extraction"""
+    """Cherche sur OpenCorporates"""
     try:
         url = "https://api.opencorporates.com/v0.4/companies/search"
         params = {
             "q": name,
             "format": "json",
-            "per_page": 3
+            "per_page": 1
         }
         r = requests.get(url, params=params, headers=HEADERS, timeout=5)
         r.raise_for_status()
@@ -154,11 +154,16 @@ def extract_owners_opencorporates(name: str) -> List[Dict]:
         parent = company.get("parent_company_name")
         if parent:
             path.append(parent)
+            owners.append({
+                "path": path,
+                "is_human": False,
+                "source": "OpenCorporates"
+            })
         
-        # Officers/directeurs (souvent les propriétaires)
+        # Officers/directeurs
         officers_name = company.get("officer_names", [])
         if officers_name:
-            for officer in officers_name[:1]:  # Top 1 officer
+            for officer in officers_name[:1]:
                 owners.append({
                     "path": path + [officer],
                     "is_human": True,
@@ -202,7 +207,7 @@ def search_wikipedia(name: str) -> Optional[str]:
         return None
 
 def extract_owners_wikipedia(title: str) -> List[Dict]:
-    """Scrape l'infobox Wikipedia pour les propriétaires"""
+    """Scrape l'infobox Wikipedia"""
     try:
         url = f"https://en.wikipedia.org/wiki/{title.replace(' ', '_')}"
         r = requests.get(url, headers=HEADERS, timeout=5)
@@ -215,9 +220,7 @@ def extract_owners_wikipedia(title: str) -> List[Dict]:
         
         owners = []
         path = [title]
-        
-        # Mots-clés de recherche
-        keywords = ['owner', 'founder', 'ceo', 'parent company', 'owned by', 'headquarters']
+        keywords = ['owner', 'founder', 'ceo', 'parent company', 'owned by']
         
         for row in infobox.find_all('tr'):
             th = row.find('th')
@@ -227,13 +230,11 @@ def extract_owners_wikipedia(title: str) -> List[Dict]:
                 continue
             
             header = th.get_text(strip=True).lower()
-            content = td.get_text(strip=True)
             
-            # Extrait les liens (noms) de propriétaires
             if any(kw in header for kw in keywords):
                 links = td.find_all('a')
                 if links:
-                    for link in links[:2]:  # Top 2
+                    for link in links[:2]:
                         owner_name = link.get_text(strip=True)
                         if owner_name and len(owner_name) > 2:
                             owners.append({
@@ -241,12 +242,6 @@ def extract_owners_wikipedia(title: str) -> List[Dict]:
                                 "is_human": any(x in header for x in ['owner', 'founder', 'ceo']),
                                 "source": "Wikipedia"
                             })
-                else:
-                    owners.append({
-                        "path": path + [content],
-                        "is_human": any(x in header for x in ['owner', 'founder']),
-                        "source": "Wikipedia"
-                    })
                 break
         
         if not owners:
@@ -262,105 +257,64 @@ def extract_owners_wikipedia(title: str) -> List[Dict]:
         return []
 
 # ============================================================================
-# YAHOO FINANCE - Source 4 (actionnaires publics)
+# DUCKDUCKGO - Source 4 (fallback intelligent)
 # ============================================================================
 
-def extract_owners_yahoo(name: str) -> List[Dict]:
-    """Cherche les actionnaires majeurs via Yahoo Finance"""
+def search_duckduckgo(query: str) -> List[Dict]:
+    """Cherche via DuckDuckGo et extrait les propriétaires"""
     try:
-        # Cherche d'abord le ticker
-        search_url = f"https://query1.finance.yahoo.com/v10/finance/autocomplete"
-        params = {"query": name}
-        r = requests.get(search_url, params=params, headers=HEADERS, timeout=5)
+        # DuckDuckGo API gratuite
+        url = "https://api.duckduckgo.com/"
+        params = {
+            "q": f"{query} owner founder company",
+            "format": "json"
+        }
+        r = requests.get(url, params=params, headers=HEADERS, timeout=5)
         r.raise_for_status()
+        data = r.json()
         
-        results = r.json().get("ResultSet", {}).get("Result", [])
-        if not results:
-            return []
-        
-        ticker = results[0].get("symbol")
-        if not ticker:
-            return []
-        
-        # Récupère les actionnaires
-        holders_url = f"https://finance.yahoo.com/quote/{ticker}/holders"
-        r = requests.get(holders_url, headers=HEADERS, timeout=5)
-        r.raise_for_status()
-        soup = BeautifulSoup(r.content, 'html.parser')
-        
-        # Cherche le tableau des actionnaires
-        tables = soup.find_all('table')
         owners = []
         
-        for table in tables:
-            rows = table.find_all('tr')
-            for row in rows[1:4]:  # Top 3 actionnaires
-                cells = row.find_all('td')
-                if len(cells) >= 2:
-                    holder_name = cells[0].get_text(strip=True)
-                    percentage = cells[1].get_text(strip=True)
-                    
-                    # Filtre > 10%
-                    try:
-                        pct = float(percentage.replace('%', '').replace(',', ''))
-                        if pct > 10:
-                            owners.append({
-                                "path": [name, holder_name],
-                                "is_human": True,
-                                "source": f"Yahoo Finance ({percentage})"
-                            })
-                    except:
-                        pass
+        # Abstract (résumé direct)
+        abstract = data.get("AbstractText", "")
+        if abstract and ("owner" in abstract.lower() or "founded" in abstract.lower()):
+            # Extrait les noms potentiels
+            sentences = abstract.split('. ')
+            for sentence in sentences[:2]:
+                if 'owner' in sentence.lower() or 'founded' in sentence.lower():
+                    # Cherche des noms propres (mots capitalisés)
+                    words = sentence.split()
+                    for i, word in enumerate(words):
+                        if word[0].isupper() and i > 0:
+                            if any(kw in sentence.lower() for kw in ['owner', 'founded', 'by']):
+                                potential_owner = ' '.join(words[i:min(i+3, len(words))])
+                                if len(potential_owner) > 3 and potential_owner not in query:
+                                    owners.append({
+                                        "path": [query, potential_owner.rstrip(',.')],
+                                        "is_human": True,
+                                        "source": "DuckDuckGo"
+                                    })
+                                    break
+        
+        # Cherche aussi dans les related topics
+        related = data.get("RelatedTopics", [])
+        for topic in related[:3]:
+            text = topic.get("Text", "") + " " + topic.get("FirstURL", "")
+            if ("owner" in text.lower() or "founder" in text.lower()) and query.lower() in text.lower():
+                owners.append({
+                    "path": [query, topic.get("Text", "").split(' - ')[0]],
+                    "is_human": True,
+                    "source": "DuckDuckGo"
+                })
+                break
         
         return owners
     except Exception as e:
-        logger.warning(f"Yahoo Finance error: {e}")
+        logger.warning(f"DuckDuckGo search error: {e}")
         return []
 
 # ============================================================================
-# GOOGLE SEARCH - Source 5 (fallback)
-# ============================================================================
-
-def extract_owners_google(name: str) -> List[Dict]:
-    """Scrape les résultats Google pour trouver les propriétaires"""
-    try:
-        query = f"{name} owner founder company"
-        search_url = "https://www.google.com/search"
-        params = {"q": query}
-        r = requests.get(search_url, params=params, headers=HEADERS, timeout=5)
-        r.raise_for_status()
-        
-        soup = BeautifulSoup(r.content, 'html.parser')
-        
-        # Cherche les snippets de réponse
-        owners = []
-        snippets = soup.find_all('span', {'class': 'st'})
-        
-        for snippet in snippets[:3]:
-            text = snippet.get_text()
-            # Pattern simple : "X owns Y" ou "founded by Z"
-            if 'founded' in text.lower() or 'owner' in text.lower():
-                # Extrait des noms (heuristique)
-                words = text.split()
-                for i, word in enumerate(words):
-                    if word.lower() in ['founded', 'owner', 'owned']:
-                        if i + 1 < len(words):
-                            owner = ' '.join(words[i+1:i+3])
-                            if len(owner) > 3:
-                                owners.append({
-                                    "path": [name, owner.strip('.')],
-                                    "is_human": True,
-                                    "source": "Google Search"
-                                })
-                                break
-        
-        return owners
-    except Exception as e:
-        logger.warning(f"Google search error: {e}")
-        return []
-
-# ============================================================================
-# AGREGATION ET FUSION
+# AGREGATION
 # ============================================================================
 
 def find_all_owners(query: str) -> Dict:
@@ -370,8 +324,7 @@ def find_all_owners(query: str) -> Dict:
         "wikidata": [],
         "wikipedia": [],
         "opencorporates": [],
-        "yahoo_finance": [],
-        "google_search": [],
+        "duckduckgo": [],
         "best_result": None,
         "alternatives": []
     }
@@ -389,16 +342,12 @@ def find_all_owners(query: str) -> Dict:
     # OpenCorporates
     results["opencorporates"] = extract_owners_opencorporates(query)
     
-    # Yahoo Finance
-    results["yahoo_finance"] = extract_owners_yahoo(query)
-    
-    # Google Search (fallback)
-    if not results["opencorporates"] and not results["wikidata"]:
-        results["google_search"] = extract_owners_google(query)
+    # DuckDuckGo (toujours, comme fallback)
+    results["duckduckgo"] = search_duckduckgo(query)
     
     # Fusion intelligente
     all_results = []
-    for source in ['yahoo_finance', 'opencorporates', 'wikidata', 'wikipedia', 'google_search']:
+    for source in ['opencorporates', 'wikidata', 'wikipedia', 'duckduckgo']:
         for r in results[source]:
             all_results.append(r)
     
@@ -415,11 +364,11 @@ def find_all_owners(query: str) -> Dict:
     best = all_results[0]
     results["best_result"] = best
     
-    # Alternatives (chemins différents)
+    # Alternatives
     seen_paths = {tuple(best["path"])}
     for data in all_results[1:]:
         path_tuple = tuple(data.get("path", []))
-        if path_tuple not in seen_paths and len(results["alternatives"]) < 3:
+        if path_tuple not in seen_paths and len(results["alternatives"]) < 5:
             results["alternatives"].append(data)
             seen_paths.add(path_tuple)
     
