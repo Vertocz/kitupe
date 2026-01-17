@@ -20,16 +20,34 @@ logger = logging.getLogger(__name__)
 # ============================================================================
 
 def search_duckduckgo(query: str) -> Optional[Dict]:
-    """Cherche via DuckDuckGo API et retourne un résultat structuré"""
+    """Cherche via DuckDuckGo API avec plusieurs requêtes"""
     try:
         url = "https://api.duckduckgo.com/"
-        params = {
-            "q": f"{query} owner founder CEO",
-            "format": "json"
-        }
-        r = requests.get(url, params=params, headers=HEADERS, timeout=5)
-        r.raise_for_status()
-        return r.json()
+        
+        # Essaie d'abord une requête directe
+        queries = [
+            f"{query} company owner",
+            f"{query} founder",
+            f"{query} who owns",
+            query  # Fallback simple
+        ]
+        
+        for q in queries:
+            params = {
+                "q": q,
+                "format": "json"
+            }
+            r = requests.get(url, params=params, headers=HEADERS, timeout=5)
+            r.raise_for_status()
+            result = r.json()
+            
+            # Si on a un résultat avec du contenu, on le retourne
+            if result.get("AbstractText") or result.get("Definition"):
+                logger.info(f"DuckDuckGo found result for query: {q}")
+                return result
+        
+        # Si aucune requête n'a donné de résultat, retourne la dernière
+        return result
     except Exception as e:
         logger.warning(f"DuckDuckGo error: {e}")
         return None
@@ -39,41 +57,44 @@ def extract_owner_from_duckduckgo(query: str, ddg_result: Dict) -> Optional[str]
     try:
         # D'abord, regarde l'abstract
         abstract = ddg_result.get("AbstractText", "")
-        logger.info(f"DuckDuckGo abstract for '{query}': {abstract[:200] if abstract else 'EMPTY'}")
+        logger.info(f"DuckDuckGo abstract for '{query}': {abstract[:300] if abstract else 'EMPTY'}")
         
         if abstract:
             # Patterns plus flexibles
             patterns = [
-                r"(?:owned by|founder|founded by|CEO|is owned by|parent company)\s+([A-Z][a-zA-Z\s&\-\.]+?)(?:\.|,|;|$)",
-                r"([A-Z][a-zA-Z\s&\-\.]+?)\s+(?:founded|owns|owned|founder)",
+                r"owned by ([A-Z][a-zA-Z\s&\-\.]+?)(?:\.|,|;| and)",
+                r"founder[s]?(?:\s+(?:and|is))? ([A-Z][a-zA-Z\s&\-\.]+?)(?:\.|,|;)",
+                r"founded by ([A-Z][a-zA-Z\s&\-\.]+?)(?:\.|,|;)",
+                r"CEO (?:is|:) ([A-Z][a-zA-Z\s&\-\.]+?)(?:\.|,|;)",
             ]
             
             for pattern in patterns:
                 matches = re.finditer(pattern, abstract)
                 for match in matches:
                     owner = match.group(1).strip().rstrip('.,;')
-                    if len(owner) > 2 and owner.lower() != query.lower() and not any(x in owner.lower() for x in ['the', 'and is', 'was']):
-                        logger.info(f"Found owner from pattern: {owner}")
+                    # Filtre les mauvais résultats
+                    if (len(owner) > 2 and 
+                        owner.lower() != query.lower() and 
+                        not any(x in owner.lower() for x in ['the ', 'and is', 'was ', 'is a'])):
+                        logger.info(f"Found owner from pattern '{pattern}': {owner}")
                         return owner
-        
-        # Cherche dans Infobox (si disponible)
-        infobox = ddg_result.get("Infobox", "")
-        if infobox:
-            logger.info(f"DuckDuckGo infobox: {infobox}")
-            # Essaie d'extraire depuis l'infobox
-            if "founded" in infobox.lower() or "owner" in infobox.lower():
-                words = infobox.split('|')
-                for word in words:
-                    if any(kw in word.lower() for kw in ['founder', 'owner', 'ceo']):
-                        potential_owner = word.split(':')[-1].strip()
-                        if potential_owner and len(potential_owner) > 2:
-                            logger.info(f"Found owner from infobox: {potential_owner}")
-                            return potential_owner
-        
-        # Regarde aussi les Definition si c'est structuré
-        definition = ddg_result.get("Definition", "")
-        if definition and len(definition) > 10:
-            logger.info(f"DuckDuckGo definition: {definition}")
+            
+            # Si pas de pattern, essaie d'extraire les noms propres
+            # Cherche des phrases avec "is" ou "was"
+            sentences = abstract.split('. ')
+            for sentence in sentences[:3]:
+                if any(kw in sentence.lower() for kw in ['founded', 'owner', 'founder', 'created']):
+                    # Extrait les mots capitalisés (noms propres)
+                    words = sentence.split()
+                    for i, word in enumerate(words):
+                        if word and word[0].isupper() and len(word) > 2:
+                            potential = ' '.join(words[i:min(i+3, len(words))])
+                            potential = potential.rstrip('.,;')
+                            if (potential.lower() != query.lower() and 
+                                len(potential) > 2 and
+                                not any(x in potential.lower() for x in ['the ', 'and ', 'is a'])):
+                                logger.info(f"Found owner from sentence: {potential}")
+                                return potential
         
         logger.warning(f"No owner extracted from DuckDuckGo for '{query}'")
         return None
