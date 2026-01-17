@@ -5,11 +5,9 @@ import json
 from typing import Optional, List, Dict
 import logging
 import re
-from urllib.parse import quote
 
 app = Flask(__name__)
 
-# Configuration
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
 }
@@ -18,11 +16,64 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # ============================================================================
-# WIKIDATA - Source 1
+# DUCKDUCKGO - Source principale
+# ============================================================================
+
+def search_duckduckgo(query: str) -> Optional[Dict]:
+    """Cherche via DuckDuckGo API et retourne un résultat structuré"""
+    try:
+        url = "https://api.duckduckgo.com/"
+        params = {
+            "q": f"{query} owner founder CEO",
+            "format": "json"
+        }
+        r = requests.get(url, params=params, headers=HEADERS, timeout=5)
+        r.raise_for_status()
+        return r.json()
+    except Exception as e:
+        logger.warning(f"DuckDuckGo error: {e}")
+        return None
+
+def extract_owner_from_duckduckgo(query: str, ddg_result: Dict) -> Optional[str]:
+    """Extrait le nom du propriétaire des résultats DuckDuckGo"""
+    try:
+        # D'abord, regarde l'abstract
+        abstract = ddg_result.get("AbstractText", "")
+        if abstract:
+            # Patterns courants
+            patterns = [
+                r"(?:owned by|founder|founded by|CEO is)\s+([A-Z][a-zA-Z\s]+?)(?:\.|,|$)",
+                r"(?:is|was)\s+owned\s+by\s+([A-Z][a-zA-Z\s]+?)(?:\.|,|$)",
+                r"founded\s+by\s+([A-Z][a-zA-Z\s]+?)(?:\.|,|$)",
+            ]
+            
+            for pattern in patterns:
+                match = re.search(pattern, abstract, re.IGNORECASE)
+                if match:
+                    owner = match.group(1).strip()
+                    if len(owner) > 2 and owner.lower() != query.lower():
+                        return owner
+        
+        # Regarde aussi les FirstURL des RelatedTopics
+        related = ddg_result.get("RelatedTopics", [])
+        for topic in related:
+            text = topic.get("Text", "")
+            if any(kw in text.lower() for kw in ['founder', 'ceo', 'owner']):
+                words = text.split(' - ')[0].split()
+                if words and words[0][0].isupper():
+                    return words[0]
+        
+        return None
+    except Exception as e:
+        logger.warning(f"Extract from DuckDuckGo error: {e}")
+        return None
+
+# ============================================================================
+# WIKIDATA - Vérification et enrichissement
 # ============================================================================
 
 def search_wikidata_entity(name: str) -> Optional[str]:
-    """Cherche le QID d'une entité sur Wikidata"""
+    """Cherche le QID d'une entité"""
     try:
         url = "https://www.wikidata.org/w/api.php"
         params = {
@@ -34,9 +85,7 @@ def search_wikidata_entity(name: str) -> Optional[str]:
         r = requests.get(url, params=params, headers=HEADERS, timeout=5)
         r.raise_for_status()
         results = r.json().get("search", [])
-        if not results:
-            return None
-        return results[0]["id"]
+        return results[0]["id"] if results else None
     except Exception as e:
         logger.warning(f"Wikidata search error: {e}")
         return None
@@ -57,7 +106,7 @@ def get_label(entity: Dict) -> str:
     return labels.get("en", {}).get("value", "Unknown")
 
 def is_human(entity: Dict) -> bool:
-    """Vérifie si c'est une personne (Q5)"""
+    """Vérifie si c'est une personne"""
     claims = entity.get("claims", {})
     instance_of = claims.get("P31", [])
     for claim in instance_of:
@@ -68,122 +117,55 @@ def is_human(entity: Dict) -> bool:
                 return True
     return False
 
-def extract_owners_wikidata(qid: str, visited=None, path=None, depth=0) -> List[Dict]:
-    """Récupère récursivement les propriétaires sur Wikidata"""
-    if visited is None:
-        visited = set()
-    if path is None:
-        path = []
-    if depth > 8 or qid in visited:
-        return []
-    
-    visited.add(qid)
-    entity = get_wikidata_entity(qid)
-    if not entity:
-        return []
-    
-    label = get_label(entity)
-    current_path = path + [label]
-    owners = []
-    claims = entity.get("claims", {})
-    
-    # P127 (propriétaire), P749 (org mère), P112 (fondateur)
-    for prop in ["P127", "P749", "P112"]:
-        if prop in claims:
-            for claim in claims[prop]:
-                mainsnak = claim.get("mainsnak", {})
-                datavalue = mainsnak.get("datavalue", {})
-                if datavalue.get("type") == "wikibase-entityid":
-                    owner_qid = datavalue["value"]["id"]
-                    owner_entity = get_wikidata_entity(owner_qid)
-                    if owner_entity:
-                        owner_label = get_label(owner_entity)
-                        if is_human(owner_entity):
-                            owners.append({
-                                "path": current_path + [owner_label],
-                                "is_human": True,
-                                "source": "Wikidata"
-                            })
-                        else:
-                            sub_owners = extract_owners_wikidata(owner_qid, visited, current_path, depth + 1)
-                            owners.extend(sub_owners)
-    
-    if not owners:
-        owners.append({
-            "path": current_path,
-            "is_human": is_human(entity),
-            "source": "Wikidata"
-        })
-    
-    return owners
-
-# ============================================================================
-# OPENCORPORATES - Source 2
-# ============================================================================
-
-def search_opencorporates(name: str) -> Optional[Dict]:
-    """Cherche sur OpenCorporates"""
+def verify_with_wikidata(company_name: str, owner_name: str) -> Optional[Dict]:
+    """Vérifie et enrichit les données avec Wikidata"""
     try:
-        url = "https://api.opencorporates.com/v0.4/companies/search"
-        params = {
-            "q": name,
-            "format": "json",
-            "per_page": 1
-        }
-        r = requests.get(url, params=params, headers=HEADERS, timeout=5)
-        r.raise_for_status()
-        results = r.json().get("results", {}).get("companies", [])
-        if not results:
+        # Cherche la compagnie
+        company_qid = search_wikidata_entity(company_name)
+        if not company_qid:
             return None
-        return results[0]
+        
+        company = get_wikidata_entity(company_qid)
+        if not company:
+            return None
+        
+        company_label = get_label(company)
+        path = [company_label]
+        
+        # Cherche les propriétaires/fondateurs
+        claims = company.get("claims", {})
+        
+        for prop in ["P127", "P749", "P112"]:  # propriétaire, org mère, fondateur
+            if prop in claims:
+                for claim in claims[prop]:
+                    mainsnak = claim.get("mainsnak", {})
+                    datavalue = mainsnak.get("datavalue", {})
+                    if datavalue.get("type") == "wikibase-entityid":
+                        owner_qid = datavalue["value"]["id"]
+                        owner_entity = get_wikidata_entity(owner_qid)
+                        if owner_entity:
+                            owner_label = get_label(owner_entity)
+                            is_owner_human = is_human(owner_entity)
+                            
+                            return {
+                                "path": path + [owner_label],
+                                "is_human": is_owner_human,
+                                "source": "Wikidata (verified)",
+                                "verified": True
+                            }
+        
+        return {
+            "path": path,
+            "is_human": False,
+            "source": "Wikidata (verified)",
+            "verified": True
+        }
     except Exception as e:
-        logger.warning(f"OpenCorporates search error: {e}")
+        logger.warning(f"Wikidata verification error: {e}")
         return None
 
-def extract_owners_opencorporates(name: str) -> List[Dict]:
-    """Extrait les propriétaires via OpenCorporates"""
-    company = search_opencorporates(name)
-    if not company:
-        return []
-    
-    try:
-        owners = []
-        path = [company.get("name", name)]
-        
-        # Parent company
-        parent = company.get("parent_company_name")
-        if parent:
-            path.append(parent)
-            owners.append({
-                "path": path,
-                "is_human": False,
-                "source": "OpenCorporates"
-            })
-        
-        # Officers/directeurs
-        officers_name = company.get("officer_names", [])
-        if officers_name:
-            for officer in officers_name[:1]:
-                owners.append({
-                    "path": path + [officer],
-                    "is_human": True,
-                    "source": "OpenCorporates"
-                })
-        
-        if not owners:
-            owners.append({
-                "path": path,
-                "is_human": False,
-                "source": "OpenCorporates"
-            })
-        
-        return owners
-    except Exception as e:
-        logger.warning(f"OpenCorporates extract error: {e}")
-        return []
-
 # ============================================================================
-# WIKIPEDIA - Source 3
+# WIKIPEDIA - Vérification
 # ============================================================================
 
 def search_wikipedia(name: str) -> Optional[str]:
@@ -199,28 +181,28 @@ def search_wikipedia(name: str) -> Optional[str]:
         r = requests.get(url, params=params, headers=HEADERS, timeout=5)
         r.raise_for_status()
         results = r.json().get("query", {}).get("search", [])
-        if not results:
-            return None
-        return results[0]["title"]
+        return results[0]["title"] if results else None
     except Exception as e:
         logger.warning(f"Wikipedia search error: {e}")
         return None
 
-def extract_owners_wikipedia(title: str) -> List[Dict]:
-    """Scrape l'infobox Wikipedia"""
+def verify_with_wikipedia(company_name: str) -> Optional[Dict]:
+    """Vérifie avec Wikipedia"""
     try:
-        url = f"https://en.wikipedia.org/wiki/{title.replace(' ', '_')}"
+        wiki_title = search_wikipedia(company_name)
+        if not wiki_title:
+            return None
+        
+        url = f"https://en.wikipedia.org/wiki/{wiki_title.replace(' ', '_')}"
         r = requests.get(url, headers=HEADERS, timeout=5)
         r.raise_for_status()
         soup = BeautifulSoup(r.content, 'html.parser')
         
         infobox = soup.find('table', {'class': 'infobox'})
         if not infobox:
-            return []
+            return None
         
-        owners = []
-        path = [title]
-        keywords = ['owner', 'founder', 'ceo', 'parent company', 'owned by']
+        keywords = ['owner', 'founder', 'ceo', 'parent company']
         
         for row in infobox.find_all('tr'):
             th = row.find('th')
@@ -234,143 +216,68 @@ def extract_owners_wikipedia(title: str) -> List[Dict]:
             if any(kw in header for kw in keywords):
                 links = td.find_all('a')
                 if links:
-                    for link in links[:2]:
-                        owner_name = link.get_text(strip=True)
-                        if owner_name and len(owner_name) > 2:
-                            owners.append({
-                                "path": path + [owner_name],
-                                "is_human": any(x in header for x in ['owner', 'founder', 'ceo']),
-                                "source": "Wikipedia"
-                            })
-                break
+                    owner_name = links[0].get_text(strip=True)
+                    is_owner_human = any(x in header for x in ['owner', 'founder', 'ceo'])
+                    
+                    return {
+                        "path": [wiki_title, owner_name],
+                        "is_human": is_owner_human,
+                        "source": "Wikipedia (verified)",
+                        "verified": True
+                    }
         
-        if not owners:
-            owners.append({
-                "path": path,
-                "is_human": False,
-                "source": "Wikipedia"
-            })
-        
-        return owners
+        return None
     except Exception as e:
-        logger.warning(f"Wikipedia scrape error: {e}")
-        return []
+        logger.warning(f"Wikipedia verification error: {e}")
+        return None
 
 # ============================================================================
-# DUCKDUCKGO - Source 4 (fallback intelligent)
+# PIPELINE PRINCIPAL
 # ============================================================================
 
-def search_duckduckgo(query: str) -> List[Dict]:
-    """Cherche via DuckDuckGo et extrait les propriétaires"""
-    try:
-        # DuckDuckGo API gratuite
-        url = "https://api.duckduckgo.com/"
-        params = {
-            "q": f"{query} owner founder company",
-            "format": "json"
-        }
-        r = requests.get(url, params=params, headers=HEADERS, timeout=5)
-        r.raise_for_status()
-        data = r.json()
-        
-        owners = []
-        
-        # Abstract (résumé direct)
-        abstract = data.get("AbstractText", "")
-        if abstract and ("owner" in abstract.lower() or "founded" in abstract.lower()):
-            # Extrait les noms potentiels
-            sentences = abstract.split('. ')
-            for sentence in sentences[:2]:
-                if 'owner' in sentence.lower() or 'founded' in sentence.lower():
-                    # Cherche des noms propres (mots capitalisés)
-                    words = sentence.split()
-                    for i, word in enumerate(words):
-                        if word[0].isupper() and i > 0:
-                            if any(kw in sentence.lower() for kw in ['owner', 'founded', 'by']):
-                                potential_owner = ' '.join(words[i:min(i+3, len(words))])
-                                if len(potential_owner) > 3 and potential_owner not in query:
-                                    owners.append({
-                                        "path": [query, potential_owner.rstrip(',.')],
-                                        "is_human": True,
-                                        "source": "DuckDuckGo"
-                                    })
-                                    break
-        
-        # Cherche aussi dans les related topics
-        related = data.get("RelatedTopics", [])
-        for topic in related[:3]:
-            text = topic.get("Text", "") + " " + topic.get("FirstURL", "")
-            if ("owner" in text.lower() or "founder" in text.lower()) and query.lower() in text.lower():
-                owners.append({
-                    "path": [query, topic.get("Text", "").split(' - ')[0]],
-                    "is_human": True,
-                    "source": "DuckDuckGo"
-                })
-                break
-        
-        return owners
-    except Exception as e:
-        logger.warning(f"DuckDuckGo search error: {e}")
-        return []
-
-# ============================================================================
-# AGREGATION
-# ============================================================================
-
-def find_all_owners(query: str) -> Dict:
-    """Cherche les propriétaires sur toutes les sources"""
+def find_owner(query: str) -> Dict:
+    """Pipeline : DuckDuckGo cherche, Wikidata/Wikipedia vérifient"""
     results = {
         "query": query,
-        "wikidata": [],
-        "wikipedia": [],
-        "opencorporates": [],
-        "duckduckgo": [],
-        "best_result": None,
-        "alternatives": []
+        "primary_result": None,
+        "verification": [],
+        "best_result": None
     }
     
-    # Wikidata
-    wikidata_qid = search_wikidata_entity(query)
-    if wikidata_qid:
-        results["wikidata"] = extract_owners_wikidata(wikidata_qid)
-    
-    # Wikipedia
-    wiki_title = search_wikipedia(query)
-    if wiki_title:
-        results["wikipedia"] = extract_owners_wikipedia(wiki_title)
-    
-    # OpenCorporates
-    results["opencorporates"] = extract_owners_opencorporates(query)
-    
-    # DuckDuckGo (toujours, comme fallback)
-    results["duckduckgo"] = search_duckduckgo(query)
-    
-    # Fusion intelligente
-    all_results = []
-    for source in ['opencorporates', 'wikidata', 'wikipedia', 'duckduckgo']:
-        for r in results[source]:
-            all_results.append(r)
-    
-    if not all_results:
+    # 1. DuckDuckGo cherche
+    ddg_result = search_duckduckgo(query)
+    if not ddg_result:
         return results
     
-    # Trie : humain d'abord, puis par longueur du chemin
-    all_results.sort(
-        key=lambda x: (-x.get("is_human", False), -len(x.get("path", []))),
-        reverse=True
+    owner_name = extract_owner_from_duckduckgo(query, ddg_result)
+    if not owner_name:
+        return results
+    
+    # Résultat primaire de DuckDuckGo
+    results["primary_result"] = {
+        "path": [query, owner_name],
+        "is_human": True,
+        "source": "DuckDuckGo"
+    }
+    
+    # 2. Vérifie avec Wikidata
+    wikidata_verification = verify_with_wikidata(query, owner_name)
+    if wikidata_verification:
+        results["verification"].append(wikidata_verification)
+    
+    # 3. Vérifie avec Wikipedia
+    wikipedia_verification = verify_with_wikipedia(query)
+    if wikipedia_verification:
+        results["verification"].append(wikipedia_verification)
+    
+    # Détermine le meilleur résultat
+    # Priorise les résultats vérifiés (avec humain trouvé)
+    all_candidates = [results["primary_result"]] + results["verification"]
+    all_candidates.sort(
+        key=lambda x: (-x.get("is_human", False), -len(x.get("path", [])))
     )
     
-    # Meilleur résultat
-    best = all_results[0]
-    results["best_result"] = best
-    
-    # Alternatives
-    seen_paths = {tuple(best["path"])}
-    for data in all_results[1:]:
-        path_tuple = tuple(data.get("path", []))
-        if path_tuple not in seen_paths and len(results["alternatives"]) < 5:
-            results["alternatives"].append(data)
-            seen_paths.add(path_tuple)
+    results["best_result"] = all_candidates[0] if all_candidates else None
     
     return results
 
@@ -390,7 +297,7 @@ def search():
     if not query:
         return jsonify({"error": "Empty query"}), 400
     
-    results = find_all_owners(query)
+    results = find_owner(query)
     return jsonify(results)
 
 if __name__ == "__main__":
