@@ -1,3 +1,89 @@
+J'ai une idée, mais ça ne fonctionne pas vraiment. Ca me renvoie Steve Jobs et des trucs comme ça. Des idées pour l'améliorer ?
+18:48
+
+J'ai analysé votre code et je vois le problème principal : vous cherchez le fondateur/CEO au lieu du propriétaire actuel réel. Steve Jobs pour Apple est un bon exemple - il est le fondateur, mais Apple est maintenant une entreprise publique sans propriétaire unique.
+
+Voici quelques améliorations majeures que je propose :
+Problèmes identifiés :
+
+    Confusion fondateur vs propriétaire : Vos patterns regex cherchent "founder" et "CEO", pas le propriétaire actuel
+    Entreprises publiques : Pas de gestion des cas où il n'y a pas de propriétaire unique
+    Structures complexes : Pas de gestion des holdings, filiales, etc.
+    Query Tavily trop générique : "owner founder company" mélange tout
+
+Solutions proposées :
+Improved Owner Finder
+Code 
+Principales améliorations :
+
+    Queries Tavily spécialisées : Recherche spécifique "owned by" / "parent company" en EXCLUANT "founder" et "CEO"
+    Patterns regex repensés :
+        Focus sur "subsidiary of", "owned by", "parent company"
+        Détection des entreprises publiques
+        Exclusion explicite des fondateurs et ex-propriétaires
+    Système de confiance : Score les résultats selon leur fiabilité
+    Gestion des cas spéciaux :
+        Entreprises publiques → Pas de propriétaire unique
+        Holdings/filiales → Remonte la chaîne
+        Marques → Trouve la société mère
+    Priorisation intelligente :
+        Wikidata P749 (parent) > P127 (owned by) > P112 (founder)
+        Wikipedia : "parent" > "owner" > "founder"
+
+Testez avec des cas comme :
+
+    Instagram → devrait trouver Meta
+    YouTube → devrait trouver Google/Alphabet
+    WhatsApp → devrait trouver Meta
+    Apple → devrait identifier "publicly traded"
+
+Ça devrait beaucoup mieux fonctionner !
+
+Et j'aimerais que tu améliores aussi l'apparence du machin. Idéalement, je veux le nom de la marque et son logo, et le nom du ou des personnes qui s'enrichissent quand on achète les produiots de cette marque
+18:51
+
+Je vais améliorer l'interface pour mieux mettre en valeur la marque et les propriétaires réels (personnes physiques). L'idée est de créer un parcours visuel clair : "Quand tu achètes X, tu enrichis Y".
+Kitupé - Interface améliorée
+Artéfact interactif 
+
+Voilà ! J'ai complètement repensé l'interface avec ces améliorations majeures :
+🎨 Changements visuels :
+
+    Section marque (en haut, fond bleu clair) :
+        Nom de la marque en très grand
+        Logo bien visible
+        Label "Tu achètes"
+
+    Flèche animée : Montre visuellement le flux d'argent
+
+    Section propriétaire (carte blanche centrale) :
+        Message clair : "Tu enrichis [NOM]"
+        Photo ronde du propriétaire (ou initiale si pas de photo)
+        Badge rouge "👤 Personne" ou "🏢 Entreprise"
+        Effet hover sur les cartes
+
+    Chaîne de propriété : Si il y a des intermédiaires (ex: Instagram → Meta → actionnaires)
+
+    Cas entreprise publique : Encadré jaune spécial qui explique qu'il n'y a pas de propriétaire unique
+
+    Sources repliables : Les vérifications sont masquées par défaut dans un accordéon
+
+🎯 L'impact visuel :
+
+L'utilisateur voit immédiatement :
+
+    ✅ La marque qu'il achète (logo + nom)
+    ✅ La personne/entreprise qui s'enrichit (photo + nom)
+    ✅ Le lien direct entre les deux
+
+Teste avec des exemples comme :
+
+    Instagram → devrait montrer Mark Zuckerberg
+    WhatsApp → devrait montrer Meta/Zuckerberg
+    Starbucks → devrait montrer entreprise publique
+
+
+Claude est une IA et peut faire des erreurs. Veuillez vérifier les réponses.
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -16,14 +102,12 @@
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
             padding: 20px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
         }
 
         .container {
             width: 100%;
-            max-width: 900px;
+            max-width: 1000px;
+            margin: 0 auto;
         }
 
         .header {
@@ -34,22 +118,22 @@
         }
 
         .header h1 {
-            font-size: 2.5em;
+            font-size: 3em;
             margin-bottom: 10px;
             font-weight: 700;
             letter-spacing: -1px;
         }
 
         .header p {
-            font-size: 1.1em;
+            font-size: 1.2em;
             opacity: 0.95;
             font-weight: 300;
         }
 
         .search-box {
             background: white;
-            border-radius: 12px;
-            padding: 30px;
+            border-radius: 16px;
+            padding: 35px;
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
             margin-bottom: 30px;
             animation: slideUp 0.6s ease-out;
@@ -57,31 +141,31 @@
 
         .search-box form {
             display: flex;
-            gap: 10px;
+            gap: 12px;
         }
 
         .search-box input {
             flex: 1;
-            padding: 14px 20px;
+            padding: 16px 24px;
             border: 2px solid #e0e0e0;
-            border-radius: 8px;
-            font-size: 1em;
+            border-radius: 10px;
+            font-size: 1.1em;
             transition: all 0.3s ease;
         }
 
         .search-box input:focus {
             outline: none;
             border-color: #667eea;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+            box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
         }
 
         .search-box button {
-            padding: 14px 30px;
+            padding: 16px 36px;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             border: none;
-            border-radius: 8px;
-            font-size: 1em;
+            border-radius: 10px;
+            font-size: 1.1em;
             font-weight: 600;
             cursor: pointer;
             transition: all 0.3s ease;
@@ -90,10 +174,6 @@
         .search-box button:hover {
             transform: translateY(-2px);
             box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
-        }
-
-        .search-box button:active {
-            transform: translateY(0);
         }
 
         .loading {
@@ -112,8 +192,8 @@
             border: 4px solid rgba(255, 255, 255, 0.3);
             border-top: 4px solid white;
             border-radius: 50%;
-            width: 40px;
-            height: 40px;
+            width: 50px;
+            height: 50px;
             animation: spin 1s linear infinite;
             margin: 0 auto 20px;
         }
@@ -132,178 +212,295 @@
             display: block;
         }
 
-        .result-card {
+        /* CARTE PRINCIPALE */
+        .main-result {
             background: white;
-            border-radius: 12px;
-            padding: 30px;
+            border-radius: 20px;
+            padding: 0;
             margin-bottom: 20px;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
-        }
-
-        .result-title {
-            font-size: 1.8em;
-            font-weight: 700;
-            margin-bottom: 25px;
-            color: #333;
-            padding-bottom: 15px;
-            border-bottom: 2px solid #f0f0f0;
-        }
-
-        .result-section {
-            margin-bottom: 20px;
-        }
-
-        .source-accordion {
-            background: #f8f9fa;
-            border-radius: 8px;
-            margin-bottom: 15px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
             overflow: hidden;
-            border: 1px solid #e9ecef;
+        }
+
+        .result-hero {
+            background: linear-gradient(135deg, #f0f4ff 0%, #e8efff 100%);
+            padding: 50px 40px;
+            text-align: center;
+            border-bottom: 3px solid #667eea;
+        }
+
+        .brand-section {
+            margin-bottom: 40px;
+        }
+
+        .brand-label {
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: #667eea;
+            font-weight: 700;
+            margin-bottom: 15px;
+        }
+
+        .brand-name {
+            font-size: 2.5em;
+            font-weight: 800;
+            color: #1a1a1a;
+            margin-bottom: 20px;
+            line-height: 1.2;
+        }
+
+        .brand-logo {
+            max-width: 200px;
+            max-height: 200px;
+            margin: 0 auto;
+            display: block;
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            background: white;
+            padding: 20px;
+        }
+
+        .enrichment-arrow {
+            font-size: 3em;
+            color: #667eea;
+            margin: 30px 0;
+            animation: bounce 2s ease-in-out infinite;
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        .owner-section {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            margin: -30px 30px 0 30px;
+            box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.1);
+            position: relative;
+        }
+
+        .enrichment-message {
+            font-size: 1.3em;
+            color: #333;
+            margin-bottom: 30px;
+            font-weight: 500;
+            text-align: center;
+        }
+
+        .enrichment-message strong {
+            color: #667eea;
+            font-weight: 700;
+        }
+
+        .owners-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 25px;
+            margin-top: 30px;
+        }
+
+        .owner-card {
+            background: linear-gradient(135deg, #fff5f5 0%, #fff 100%);
+            border: 2px solid #fecaca;
+            border-radius: 16px;
+            padding: 25px;
+            text-align: center;
             transition: all 0.3s ease;
         }
 
-        .source-accordion.active {
-            background: #f0f4ff;
-            border-color: #667eea;
+        .owner-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 40px rgba(220, 38, 38, 0.15);
+            border-color: #dc2626;
         }
 
-        .accordion-header {
-            padding: 16px 20px;
+        .owner-photo {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            object-fit: cover;
+            margin: 0 auto 20px;
+            display: block;
+            border: 4px solid #dc2626;
+            box-shadow: 0 8px 25px rgba(220, 38, 38, 0.2);
+        }
+
+        .owner-photo-placeholder {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
+            margin: 0 auto 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 3em;
+            color: white;
+            border: 4px solid #dc2626;
+        }
+
+        .owner-name {
+            font-size: 1.4em;
+            font-weight: 700;
+            color: #1a1a1a;
+            margin-bottom: 8px;
+        }
+
+        .owner-type {
+            display: inline-block;
+            background: #dc2626;
+            color: white;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .ownership-chain {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 25px;
+            margin-top: 30px;
+        }
+
+        .chain-title {
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #666;
+            margin-bottom: 15px;
+            font-weight: 700;
+        }
+
+        .chain-path {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .chain-item {
+            background: white;
+            padding: 10px 18px;
+            border-radius: 8px;
+            font-weight: 600;
+            color: #333;
+            border: 2px solid #e0e0e0;
+            transition: all 0.2s ease;
+        }
+
+        .chain-item:hover {
+            border-color: #667eea;
+            color: #667eea;
+        }
+
+        .chain-arrow {
+            font-size: 1.5em;
+            color: #999;
+        }
+
+        /* SECTION DÉTAILS */
+        .details-section {
+            background: white;
+            border-radius: 16px;
+            padding: 30px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+        }
+
+        .details-toggle {
+            background: none;
+            border: none;
+            width: 100%;
+            text-align: left;
+            padding: 0;
             cursor: pointer;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            font-weight: 600;
+            font-size: 1.1em;
+            font-weight: 700;
             color: #333;
-            user-select: none;
-            transition: all 0.2s ease;
         }
 
-        .accordion-header:hover {
-            background: rgba(102, 126, 234, 0.05);
-        }
-
-        .accordion-header.active {
-            background: rgba(102, 126, 234, 0.1);
+        .details-toggle:hover {
             color: #667eea;
         }
 
-        .accordion-icon {
-            font-size: 1.2em;
+        .toggle-icon {
+            font-size: 1.3em;
             transition: transform 0.3s ease;
+            color: #667eea;
         }
 
-        .accordion-header.active .accordion-icon {
+        .toggle-icon.open {
             transform: rotate(180deg);
         }
 
-        .accordion-content {
+        .details-content {
             max-height: 0;
             overflow: hidden;
-            transition: max-height 0.3s ease;
-            background: white;
+            transition: max-height 0.4s ease;
         }
 
-        .accordion-content.active {
-            max-height: 500px;
-            padding: 20px;
-            border-top: 1px solid #e9ecef;
+        .details-content.open {
+            max-height: 1000px;
+            margin-top: 20px;
         }
 
-        .path {
-            font-size: 1em;
-            color: #555;
-            line-height: 1.8;
-            margin-bottom: 12px;
-        }
-
-        .path-item {
-            display: inline-block;
-            background: #f0f4ff;
-            padding: 6px 12px;
-            border-radius: 6px;
-            margin: 4px 4px 4px 0;
-            font-weight: 500;
-            color: #667eea;
-        }
-
-        .path-arrow {
-            margin: 0 6px;
-            color: #999;
-        }
-
-        .human-badge {
-            display: inline-block;
-            background: #10b981;
-            color: white;
-            padding: 4px 10px;
-            border-radius: 4px;
-            font-size: 0.85em;
-            margin-left: 8px;
-            font-weight: 600;
-        }
-
-        .source-label {
-            font-size: 0.9em;
-            color: #999;
-            margin-top: 12px;
-            padding-top: 12px;
-            border-top: 1px solid #e9ecef;
-        }
-
-        .source-link {
-            color: #667eea;
-            text-decoration: none;
-            font-weight: 600;
-        }
-
-        .source-link:hover {
-            text-decoration: underline;
-        }
-
-        .alternatives {
-            margin-top: 30px;
-            padding-top: 30px;
-            border-top: 2px solid #f0f0f0;
-        }
-
-        .alternatives-title {
-            font-size: 1.1em;
-            font-weight: 700;
-            color: #666;
-            margin-bottom: 15px;
-        }
-
-        .alternative-item {
+        .verification-item {
             background: #f8f9fa;
-            padding: 15px;
+            border-left: 4px solid #667eea;
+            padding: 20px;
+            margin-bottom: 15px;
             border-radius: 8px;
+        }
+
+        .verification-source {
+            font-weight: 700;
+            color: #667eea;
             margin-bottom: 10px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            border-left: 3px solid #ddd;
-        }
-
-        .alternative-item:hover {
-            background: #f0f4ff;
-            border-left-color: #667eea;
-        }
-
-        .alternative-path {
-            color: #555;
             font-size: 0.95em;
         }
 
-        .alternative-source {
-            color: #999;
-            font-size: 0.85em;
-            margin-top: 8px;
+        .verification-path {
+            color: #555;
+            line-height: 1.8;
+        }
+
+        .public-company-notice {
+            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+            border: 2px solid #f59e0b;
+            border-radius: 16px;
+            padding: 30px;
+            text-align: center;
+            margin: 30px 0;
+        }
+
+        .public-company-notice .icon {
+            font-size: 3em;
+            margin-bottom: 15px;
+        }
+
+        .public-company-notice h3 {
+            font-size: 1.5em;
+            color: #92400e;
+            margin-bottom: 10px;
+        }
+
+        .public-company-notice p {
+            color: #78350f;
+            font-size: 1.1em;
         }
 
         .error-message {
             background: white;
-            border-radius: 12px;
-            padding: 30px;
+            border-radius: 16px;
+            padding: 40px;
             text-align: center;
             color: #dc2626;
             display: none;
@@ -316,8 +513,8 @@
         }
 
         .error-icon {
-            font-size: 2em;
-            margin-bottom: 10px;
+            font-size: 3em;
+            margin-bottom: 15px;
         }
 
         @keyframes fadeIn {
@@ -328,10 +525,10 @@
         @keyframes slideUp {
             from {
                 opacity: 0;
-                transform: translateY(20px);
+                transform: translateY(30px);
             }
             to {
-                opacity: 0;
+                opacity: 1;
                 transform: translateY(0);
             }
         }
@@ -345,12 +542,25 @@
                 flex-direction: column;
             }
 
-            .search-box button {
-                width: 100%;
+            .brand-name {
+                font-size: 1.8em;
             }
 
-            .result-card {
-                padding: 20px;
+            .owners-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .chain-path {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .chain-arrow {
+                transform: rotate(90deg);
+            }
+
+            .result-hero, .owner-section {
+                padding: 30px 20px;
             }
         }
     </style>
@@ -358,8 +568,8 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>Kitupé</h1>
-            <p>Découvre qui tu enrichis vraiment</p>
+            <h1>🔍 Kitupé</h1>
+            <p>Découvre qui s'enrichit vraiment quand tu achètes</p>
         </div>
 
         <div class="search-box">
@@ -367,10 +577,10 @@
                 <input 
                     type="text" 
                     id="queryInput" 
-                    placeholder="Cherche une marque, une chaîne, un magasin..." 
+                    placeholder="Nike, Starbucks, Instagram, WhatsApp..." 
                     required
                 >
-                <button type="submit">Chercher</button>
+                <button type="submit">Découvrir</button>
             </form>
         </div>
 
@@ -427,113 +637,147 @@
 
         function displayResults(data) {
             if (!data.best_result) {
-                showError('Aucun résultat trouvé. Essaie avec un nom de compagnie/marque/chaine connu.');
+                showError('Aucun résultat trouvé. Essaie avec une marque connue (Nike, Starbucks, Instagram...)');
                 return;
             }
 
             const best = data.best_result;
-            let html = `
-                <div class="result-card">
-                    <div style="display: flex; gap: 30px; margin-bottom: 30px; align-items: flex-start;">
-                        <div style="flex: 1;">
-                            <div class="result-title">${escapeHtml(data.query)}</div>
-                            ${data.images.company_logo ? `<img src="${data.images.company_logo}" alt="Logo" style="max-width: 150px; max-height: 150px; margin-top: 15px; border-radius: 8px;">` : ''}
-                        </div>
-                        <div style="flex: 1; text-align: center;">
-                            <div style="font-size: 0.9em; color: #999; margin-bottom: 10px;">Propriétaire</div>
-                            <div style="font-weight: 600; font-size: 1.2em; color: #333; margin-bottom: 15px;">${escapeHtml(best.path[best.path.length - 1])}</div>
-                            ${data.images.owner_photo ? `<img src="${data.images.owner_photo}" alt="Propriétaire" style="max-width: 150px; max-height: 150px; border-radius: 8px; object-fit: cover;">` : ''}
-                        </div>
+            const isPublic = best.ownership_type === 'public';
+            
+            let html = '<div class="main-result">';
+            
+            // Hero section avec la marque
+            html += `
+                <div class="result-hero">
+                    <div class="brand-section">
+                        <div class="brand-label">Tu achètes</div>
+                        <h2 class="brand-name">${escapeHtml(data.query)}</h2>
+                        ${data.images.company_logo ? 
+                            `<img src="${data.images.company_logo}" alt="Logo ${escapeHtml(data.query)}" class="brand-logo">` : 
+                            `<div class="brand-logo" style="font-size: 4em; padding: 30px;">${data.query.charAt(0).toUpperCase()}</div>`
+                        }
                     </div>
-                    
-                    <div class="result-section">
-                        <div class="source-accordion active">
-                            <div class="accordion-header active" onclick="toggleAccordion(this)">
-                                <span>Chaîne de propriété</span>
-                                <span class="accordion-icon">▼</span>
-                            </div>
-                            <div class="accordion-content active">
-                                ${renderPath(best.path, best.is_human)}
-                                <div class="source-label" style="border-top: 1px solid #e9ecef; padding-top: 12px; margin-top: 12px;">Source: <strong>${best.source}</strong></div>
-                            </div>
-                        </div>
             `;
 
-            // Affiche les vérifications
-            if (data.verification && data.verification.length > 0) {
-                html += '<div style="margin-top: 20px; padding-top: 20px; border-top: 2px solid #f0f0f0;"><div style="font-size: 0.9em; color: #999; margin-bottom: 12px;">Vérification :</div>';
+            if (!isPublic) {
+                html += '<div class="enrichment-arrow">⬇️</div>';
+            }
+
+            html += '</div>';
+
+            // Section propriétaire
+            if (isPublic) {
+                html += `
+                    <div class="public-company-notice">
+                        <div class="icon">📊</div>
+                        <h3>Entreprise publique</h3>
+                        <p>${escapeHtml(data.query)} est cotée en bourse. Les bénéfices sont répartis entre de nombreux actionnaires.</p>
+                    </div>
+                `;
+            } else {
+                const ownerName = best.path[best.path.length - 1];
+                const isDirectlyHuman = best.is_human && best.path.length === 2;
                 
-                data.verification.forEach(verification => {
-                    html += `
-                        <div class="source-accordion">
-                            <div class="accordion-header" onclick="toggleAccordion(this)">
-                                <span>${verification.source}</span>
-                                <span class="accordion-icon">▼</span>
+                html += `
+                    <div class="owner-section">
+                        <div class="enrichment-message">
+                            Tu enrichis <strong>${escapeHtml(ownerName)}</strong>
+                        </div>
+                        
+                        <div class="owners-grid">
+                            <div class="owner-card">
+                `;
+
+                // Photo ou placeholder
+                if (data.images.owner_photo) {
+                    html += `<img src="${data.images.owner_photo}" alt="${escapeHtml(ownerName)}" class="owner-photo">`;
+                } else {
+                    const initial = ownerName.charAt(0).toUpperCase();
+                    html += `<div class="owner-photo-placeholder">${initial}</div>`;
+                }
+
+                html += `
+                                <div class="owner-name">${escapeHtml(ownerName)}</div>
+                                <span class="owner-type">${best.is_human ? '👤 Personne' : '🏢 Entreprise'}</span>
                             </div>
-                            <div class="accordion-content">
-                                ${renderPath(verification.path, verification.is_human)}
-                                <div class="source-label">Source: <strong>${verification.source}</strong></div>
+                        </div>
+                `;
+
+                // Chaîne de propriété si elle existe
+                if (best.path.length > 2) {
+                    html += `
+                        <div class="ownership-chain">
+                            <div class="chain-title">Chaîne de propriété</div>
+                            <div class="chain-path">
+                    `;
+                    
+                    best.path.forEach((item, index) => {
+                        html += `<span class="chain-item">${escapeHtml(item)}</span>`;
+                        if (index < best.path.length - 1) {
+                            html += '<span class="chain-arrow">→</span>';
+                        }
+                    });
+                    
+                    html += `
                             </div>
                         </div>
                     `;
-                });
-                
+                }
+
                 html += '</div>';
             }
 
             html += '</div>';
 
+            // Section détails (vérifications)
+            if (data.verification && data.verification.length > 0) {
+                html += `
+                    <div class="details-section">
+                        <button class="details-toggle" onclick="toggleDetails(this)">
+                            <span>📋 Sources et vérifications</span>
+                            <span class="toggle-icon">▼</span>
+                        </button>
+                        <div class="details-content">
+                `;
+
+                // Résultat principal
+                html += `
+                    <div class="verification-item">
+                        <div class="verification-source">🔍 ${best.source}</div>
+                        <div class="verification-path">${renderSimplePath(best.path)}</div>
+                    </div>
+                `;
+
+                // Autres vérifications
+                data.verification.forEach(v => {
+                    html += `
+                        <div class="verification-item">
+                            <div class="verification-source">✓ ${v.source}</div>
+                            <div class="verification-path">${renderSimplePath(v.path)}</div>
+                        </div>
+                    `;
+                });
+
+                html += `
+                        </div>
+                    </div>
+                `;
+            }
+
             resultsDiv.innerHTML = html;
             resultsDiv.classList.add('active');
-
-            document.querySelectorAll('.accordion-header').forEach(header => {
-                header.addEventListener('click', function() {
-                    toggleAccordion(this);
-                });
-            });
         }
 
-        function renderAlternativeSource(source, data) {
-            return `
-                <div class="source-accordion">
-                    <div class="accordion-header" onclick="toggleAccordion(this)">
-                        <span>${source}</span>
-                        <span class="accordion-icon">▼</span>
-                    </div>
-                    <div class="accordion-content">
-                        ${renderPath(data.path, data.is_human)}
-                        <div class="source-label">Source: ${source}</div>
-                    </div>
-                </div>
-            `;
+        function renderSimplePath(path) {
+            return path.map(item => escapeHtml(item)).join(' → ');
         }
 
-        function renderPath(path, isHuman) {
-            const items = path.map(item => `<span class="path-item">${escapeHtml(item)}</span>`);
-            let html = items.join('<span class="path-arrow">→</span>');
-            if (isHuman) {
-                html += '<span class="human-badge">Personne</span>';
-            }
-            return html;
-        }
-
-        function toggleAccordion(header) {
-            const content = header.nextElementSibling;
-            const isActive = header.classList.contains('active');
-
-            // Ferme tous les autres accordions du même parent
-            const parent = header.closest('.result-section') || header.closest('.results');
-            if (parent) {
-                parent.querySelectorAll('.accordion-header').forEach(h => {
-                    if (h !== header) {
-                        h.classList.remove('active');
-                        h.nextElementSibling.classList.remove('active');
-                    }
-                });
-            }
-
-            header.classList.toggle('active');
-            content.classList.toggle('active');
+        function toggleDetails(button) {
+            const icon = button.querySelector('.toggle-icon');
+            const content = button.nextElementSibling;
+            
+            icon.classList.toggle('open');
+            content.classList.toggle('open');
         }
 
         function showError(message) {
@@ -549,3 +793,4 @@
     </script>
 </body>
 </html>
+
